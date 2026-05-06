@@ -1,0 +1,1 @@
+// Responsibility: Global constants placeholder.

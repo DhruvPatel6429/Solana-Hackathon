@@ -1,0 +1,21 @@
+{
+  // TypeScript configuration placeholder for Borderless Payroll Copilot.
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "baseUrl": "."
+  },
+  "include": [
+    "app",
+    "components",
+    "lib",
+    "hooks",
+    "types",
+    "config",
+    "scripts",
+    "tests"
+  ]
+}
