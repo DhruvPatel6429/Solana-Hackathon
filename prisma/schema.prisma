@@ -1,1 +1,22 @@
-// Responsibility: Prisma schema for core tables placeholder.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Payout {
+  id               String    @id @default(cuid())
+  invoiceId        String
+  contractorWallet String
+  amountUsdc       Float
+  txSignature      String?
+  status           String
+  createdAt        DateTime  @default(now())
+  executedAt       DateTime?
+
+  @@unique([invoiceId])
+  @@index([status])
+  @@index([contractorWallet])
+}
