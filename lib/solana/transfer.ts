@@ -13,6 +13,8 @@ import {
 import { connection } from "./connection";
 import { DEVNET_USDC_MINT, getUSDCAccount, USDC_DECIMALS } from "./tokens";
 
+const MAX_BATCH_RECIPIENTS = 10;
+
 export type TransferUSDCParams = {
   fromWallet: Keypair;
   toWallet: PublicKey | string;
@@ -26,6 +28,15 @@ export type TransferWithSplitParams = {
 };
 
 export type TransferWithSplitResult = {
+  signature: string;
+};
+
+export type BatchPayoutRecipient = {
+  wallet: string;
+  amount: number;
+};
+
+export type BatchPayoutResult = {
   signature: string;
 };
 
@@ -484,6 +495,217 @@ export async function transferWithSplit({
     console.error("[solana:split-transfer] Split transfer failed", { message });
     throw new SolanaTransferError(
       `[solana:split-transfer] Failed to transfer split USDC: ${message}`,
+      error,
+    );
+  }
+}
+
+export async function executeBatchPayout(
+  recipients: BatchPayoutRecipient[],
+): Promise<BatchPayoutResult> {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    throw new SolanaTransferError(
+      "[solana:batch-payout] Recipients array must not be empty.",
+    );
+  }
+
+  if (recipients.length > MAX_BATCH_RECIPIENTS) {
+    throw new SolanaTransferError(
+      `[solana:batch-payout] Too many recipients. Maximum is ${MAX_BATCH_RECIPIENTS}, received ${recipients.length}.`,
+    );
+  }
+
+  const parsedRecipients = recipients.map((recipient, index) => {
+    if (!recipient || typeof recipient.wallet !== "string") {
+      throw new InvalidWalletAddressError(
+        String(recipient?.wallet),
+        undefined,
+        `recipient ${index + 1}`,
+      );
+    }
+
+    if (
+      typeof recipient.amount !== "number" ||
+      !Number.isFinite(recipient.amount) ||
+      recipient.amount <= 0
+    ) {
+      throw new SolanaTransferError(
+        `[solana:batch-payout] Recipient ${index + 1} amount must be greater than zero.`,
+      );
+    }
+
+    const wallet = parseWallet(recipient.wallet, `recipient ${index + 1}`);
+    const amountBaseUnits = toUSDCBaseUnits(recipient.amount);
+
+    return {
+      wallet,
+      amount: recipient.amount,
+      amountBaseUnits,
+      tokenAccount: getUSDCAccount(wallet),
+    };
+  });
+
+  const totalBaseUnits = parsedRecipients.reduce(
+    (total, recipient) => total + recipient.amountBaseUnits,
+    0n,
+  );
+
+  const { treasuryWallet } = await import("./wallet");
+  const sourceTokenAccount = getUSDCAccount(treasuryWallet.publicKey);
+
+  console.info("[solana:batch-payout] Preparing batch payout", {
+    mint: DEVNET_USDC_MINT.toBase58(),
+    treasuryWallet: treasuryWallet.publicKey.toBase58(),
+    recipientCount: parsedRecipients.length,
+    totalAmount: formatUSDC(totalBaseUnits),
+    totalAmountBaseUnits: totalBaseUnits.toString(),
+    sourceTokenAccount: sourceTokenAccount.toBase58(),
+    recipients: parsedRecipients.map((recipient) => ({
+      wallet: recipient.wallet.toBase58(),
+      amount: formatUSDC(recipient.amountBaseUnits),
+      amountBaseUnits: recipient.amountBaseUnits.toString(),
+      tokenAccount: recipient.tokenAccount.toBase58(),
+    })),
+  });
+
+  try {
+    const [sourceAccountInfo, ...recipientAccountInfos] = await Promise.all([
+      connection.getAccountInfo(sourceTokenAccount),
+      ...parsedRecipients.map((recipient) =>
+        connection.getAccountInfo(recipient.tokenAccount),
+      ),
+    ]);
+
+    if (!sourceAccountInfo) {
+      throw new InsufficientBalanceError(totalBaseUnits, 0n);
+    }
+
+    assertTokenProgramOwner("Source token account", sourceAccountInfo.owner);
+
+    recipientAccountInfos.forEach((accountInfo, index) => {
+      if (accountInfo) {
+        assertTokenProgramOwner(
+          `Recipient ${index + 1} token account`,
+          accountInfo.owner,
+        );
+      }
+    });
+
+    const sourceBalance = await getTokenBalanceBaseUnits(sourceTokenAccount);
+
+    console.info("[solana:batch-payout] Source USDC balance", {
+      tokenAccount: sourceTokenAccount.toBase58(),
+      balance: formatUSDC(sourceBalance),
+      balanceBaseUnits: sourceBalance.toString(),
+    });
+
+    if (sourceBalance < totalBaseUnits) {
+      throw new InsufficientBalanceError(totalBaseUnits, sourceBalance);
+    }
+
+    const transaction = new Transaction();
+    const createdTokenAccounts = new Set<string>();
+
+    parsedRecipients.forEach((recipient, index) => {
+      const recipientAccountInfo = recipientAccountInfos[index];
+      const tokenAccount = recipient.tokenAccount.toBase58();
+
+      if (!recipientAccountInfo && !createdTokenAccounts.has(tokenAccount)) {
+        console.info("[solana:batch-payout] Recipient ATA missing; creating it", {
+          recipientIndex: index + 1,
+          recipientWallet: recipient.wallet.toBase58(),
+          recipientTokenAccount: tokenAccount,
+        });
+
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            treasuryWallet.publicKey,
+            recipient.tokenAccount,
+            recipient.wallet,
+            DEVNET_USDC_MINT,
+          ),
+        );
+
+        createdTokenAccounts.add(tokenAccount);
+      }
+
+      transaction.add(
+        createTransferInstruction(
+          sourceTokenAccount,
+          recipient.tokenAccount,
+          treasuryWallet.publicKey,
+          recipient.amountBaseUnits,
+        ),
+      );
+    });
+
+    const latestBlockhash = await connection.getLatestBlockhash("finalized");
+    transaction.feePayer = treasuryWallet.publicKey;
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.sign(treasuryWallet);
+
+    console.info("[solana:batch-payout] Sending atomic batch transaction", {
+      recipientCount: parsedRecipients.length,
+      totalAmount: formatUSDC(totalBaseUnits),
+      instructionCount: transaction.instructions.length,
+    });
+
+    const signature = await connection.sendRawTransaction(
+      transaction.serialize(),
+      {
+        preflightCommitment: "confirmed",
+        skipPreflight: false,
+      },
+    );
+
+    console.info("[solana:batch-payout] Transaction submitted", {
+      signature,
+    });
+
+    const confirmation = await connection.confirmTransaction(
+      {
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      "finalized",
+    );
+
+    if (confirmation.value.err) {
+      throw new SolanaTransferError(
+        `[solana:batch-payout] Transaction failed during finalized confirmation: ${JSON.stringify(
+          confirmation.value.err,
+        )}`,
+      );
+    }
+
+    console.info("[solana:batch-payout] Transaction finalized", {
+      signature,
+    });
+
+    return { signature };
+  } catch (error) {
+    if (error instanceof SolanaTransferError) {
+      console.error(error.message);
+      throw error;
+    }
+
+    if (error instanceof SendTransactionError) {
+      const logs = await error.getLogs(connection).catch(() => undefined);
+      console.error("[solana:batch-payout] Send transaction failed", {
+        message: error.message,
+        logs,
+      });
+      throw new SolanaTransferError(
+        `[solana:batch-payout] Failed to send batch payout: ${error.message}`,
+        error,
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[solana:batch-payout] Batch payout failed", { message });
+    throw new SolanaTransferError(
+      `[solana:batch-payout] Failed to execute batch payout: ${message}`,
       error,
     );
   }
