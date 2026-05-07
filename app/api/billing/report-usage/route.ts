@@ -1,1 +1,3 @@
-// Responsibility: Dodo usage reporting endpoint placeholder.
+export async function POST() {
+  return new Response(null, { status: 204 });
+}

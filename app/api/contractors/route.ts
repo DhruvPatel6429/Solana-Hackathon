@@ -1,1 +1,5 @@
-// Responsibility: Contractors collection endpoint placeholder.
+import { contractors } from "@/lib/mock-data";
+
+export async function GET() {
+  return Response.json(contractors);
+}

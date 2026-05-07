@@ -1,8 +1,3 @@
-import {
-  EscrowReleaseError,
-  getEscrowStatus,
-} from "../../../../lib/solana/escrow";
-
 type RouteContext = {
   params: Promise<{
     invoiceId: string;
@@ -26,6 +21,7 @@ export async function GET(
   const { invoiceId } = await context.params;
 
   try {
+    const { getEscrowStatus } = await import("../../../../lib/solana/escrow");
     const escrow = await getEscrowStatus(invoiceId);
 
     return Response.json({
@@ -34,7 +30,7 @@ export async function GET(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status = error instanceof EscrowReleaseError ? 400 : 500;
+    const status = message.toLowerCase().includes("escrow") ? 400 : 500;
 
     console.error("[api:escrow:status] Request failed", {
       invoiceId,

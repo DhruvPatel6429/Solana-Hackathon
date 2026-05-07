@@ -1,1 +1,3 @@
-// Responsibility: Dodo webhook receiver placeholder.
+export async function POST() {
+  return Response.json({ received: true });
+}

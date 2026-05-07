@@ -2,6 +2,40 @@
 
 Borderless Payroll Copilot is a B2B SaaS platform and treasury operating system for internet-native companies. It lets a company fund a single USDC treasury on Solana and pay global contractors in seconds, while automating invoices, FX visibility, payout rules, and compliance audit trails.
 
+## Frontend demo
+
+The hackathon frontend is implemented with Next.js 14 App Router, Tailwind CSS, shadcn-style local UI primitives, React Query, Zustand, Recharts, Framer Motion, lucide-react, and tsparticles.
+
+### Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+### Frontend routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Dark landing page with particle hero, feature bento, pricing, and Dodo subscription CTAs |
+| `/onboarding` | 4-step company onboarding wizard with tier checkout, treasury funding, and payout rules |
+| `/dashboard` | Company dashboard with treasury, contractors, invoices, payouts, FX, modals, and mock API data |
+| `/contractor` | Contractor portal with onboarding, invoice status, proof links, and payment history |
+| `/contractor/invoices/new` | Invoice creation flow with dynamic line items and live preview |
+| `/compliance` | Filterable audit table with CSV/PDF export controls and Solana explorer links |
+| `/analytics` | Dark Recharts analytics for spend, currency mix, approval time, and treasury balance |
+
+### Verification
+
+```bash
+npm run typecheck
+npm run build
+```
+
+Mock data lives in `lib/mock-data.ts`, typed fetch wrappers live in `lib/api.ts`, and shared client data hooks live in `hooks/use-app-data.ts`.
+
 ## Problem and solution
 
 International contractor payroll is slow, expensive, and opaque. Traditional wires introduce delays, unpredictable FX, and manual reconciliation, while most payroll tools do not support stablecoins or on-chain settlement.

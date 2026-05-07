@@ -1,1 +1,5 @@
-// Responsibility: Payouts collection endpoint placeholder.
+import { payouts } from "@/lib/mock-data";
+
+export async function GET() {
+  return Response.json(payouts);
+}

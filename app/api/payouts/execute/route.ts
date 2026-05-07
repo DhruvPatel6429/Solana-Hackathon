@@ -1,18 +1,3 @@
-import {
-  DuplicatePayoutError,
-  executePayout,
-  PayoutExecutionError,
-  PayoutValidationError,
-} from "../../../../lib/services/payout.service";
-import {
-  EscrowAlreadyReleasedError,
-  EscrowNotFoundError,
-  EscrowReleaseError,
-} from "../../../../lib/solana/escrow";
-import {
-  InvalidWalletAddressError,
-} from "../../../../lib/solana/transfer";
-
 type ExecutePayoutRequestBody = {
   invoiceId?: unknown;
   wallet?: unknown;
@@ -38,26 +23,24 @@ function getErrorMessage(error: unknown): string {
 }
 
 function getStatusCode(error: unknown): number {
-  if (
-    error instanceof PayoutValidationError ||
-    error instanceof InvalidWalletAddressError
-  ) {
+  const name = error instanceof Error ? error.name : "";
+  if (name.includes("Validation") || name.includes("InvalidWalletAddress")) {
     return 400;
   }
 
-  if (error instanceof DuplicatePayoutError) {
+  if (name.includes("DuplicatePayout")) {
     return 409;
   }
 
-  if (error instanceof EscrowNotFoundError) {
+  if (name.includes("EscrowNotFound")) {
     return 404;
   }
 
-  if (error instanceof EscrowAlreadyReleasedError) {
+  if (name.includes("EscrowAlreadyReleased")) {
     return 409;
   }
 
-  if (error instanceof EscrowReleaseError || error instanceof PayoutExecutionError) {
+  if (name.includes("EscrowRelease") || name.includes("PayoutExecution")) {
     return 502;
   }
 
@@ -74,6 +57,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const { executePayout } = await import("../../../../lib/services/payout.service");
     const result = await executePayout({
       invoiceId: typeof body.invoiceId === "string" ? body.invoiceId : "",
       wallet: typeof body.wallet === "string" ? body.wallet : "",

@@ -1,1 +1,5 @@
-// Responsibility: Invoices collection endpoint placeholder.
+import { invoices } from "@/lib/mock-data";
+
+export async function GET() {
+  return Response.json(invoices);
+}

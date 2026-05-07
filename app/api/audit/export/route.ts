@@ -1,1 +1,5 @@
-// Responsibility: Audit export endpoint placeholder.
+import { payouts } from "@/lib/mock-data";
+
+export async function GET() {
+  return Response.json(payouts);
+}
