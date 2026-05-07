@@ -31,6 +31,7 @@
     ]
   },
   "include": [
+    "next-env.d.ts",
     "app",
     "components",
     "lib",
@@ -39,8 +40,7 @@
     "config",
     "scripts",
     "tests",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

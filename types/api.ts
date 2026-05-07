@@ -1,1 +1,8 @@
-// Responsibility: Shared API response types placeholder.
+export type ApiErrorResponse = {
+  success: false;
+  error: string;
+};
+
+export type ApiSuccessResponse<T> = T & {
+  success: true;
+};

@@ -6,19 +6,133 @@ datasource db {
   provider = "postgresql"
 }
 
+model Company {
+  id                   String       @id @default(cuid())
+  name                 String
+  planTier             String?
+  dodoCustomerId       String?
+  dodoSubscriptionId   String?
+  treasuryWalletAddress String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  users                CompanyUser[]
+  contractors          Contractor[]
+  invoices             Invoice[]
+  payouts              Payout[]
+  usageEvents          UsageEvent[]
+  auditLogs            AuditLog[]
+}
+
+model CompanyUser {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model Contractor {
+  id               String    @id @default(cuid())
+  companyId        String
+  name             String
+  country          String?
+  taxId            String?
+  payoutPreference String    @default("USDC")
+  walletAddress    String?
+  kycStatus        String    @default("PENDING")
+  status           String    @default("Active")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices         Invoice[]
+  payouts          Payout[]
+
+  @@index([companyId])
+  @@index([kycStatus])
+}
+
+model Invoice {
+  id           String    @id @default(cuid())
+  companyId    String
+  contractorId String
+  amountUsdc   Float
+  status       String    @default("PENDING")
+  invoiceHash  String?
+  description  String?
+  submittedAt  DateTime  @default(now())
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([contractorId])
+  @@index([status])
+}
+
 model Payout {
   id               String    @id @default(cuid())
+  companyId        String?
+  contractorId     String?
   invoiceId        String
   contractorWallet String
   amountUsdc       Float
+  currency         String    @default("USDC")
   escrowPda        String?
   txSignature      String?
   status           String
   createdAt        DateTime  @default(now())
   executedAt       DateTime?
+  company          Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contractor       Contractor? @relation(fields: [contractorId], references: [id], onDelete: SetNull)
 
   @@unique([invoiceId])
+  @@index([companyId])
+  @@index([contractorId])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
   @@index([escrowPda])
   @@index([status])
   @@index([contractorWallet])
+}
+
+model UsageEvent {
+  id         String   @id @default(cuid())
+  companyId  String
+  eventType  String
+  dodoEventId String?
+  reportedAt DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([eventType])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  action      String
+  actorUserId String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  source      String
+  eventId     String
+  payload     Json
+  processedAt DateTime @default(now())
+
+  @@unique([source, eventId])
+  @@index([source])
+  @@index([processedAt])
 }
