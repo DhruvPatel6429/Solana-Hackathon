@@ -3,10 +3,14 @@ import type { Payout } from "@prisma/client";
 
 import { prisma } from "../db/prisma";
 import {
-  InsufficientBalanceError,
+  deriveEscrowPda,
+  EscrowAlreadyReleasedError,
+  EscrowNotFoundError,
+  EscrowReleaseError,
+  releaseEscrow,
+} from "../solana/escrow";
+import {
   InvalidWalletAddressError,
-  SolanaTransferError,
-  transferUSDC,
 } from "../solana/transfer";
 
 type ExecutePayoutInput = {
@@ -114,6 +118,7 @@ export async function executePayout(
   }
 
   let payout: Payout;
+  const escrowPda = deriveEscrowPda(invoiceId).escrowPda.toBase58();
 
   try {
     payout = await prisma.payout.create({
@@ -121,6 +126,7 @@ export async function executePayout(
         invoiceId,
         contractorWallet: wallet,
         amountUsdc: amount,
+        escrowPda,
         status: "PENDING",
       },
     });
@@ -141,13 +147,17 @@ export async function executePayout(
   let txHash: string;
 
   try {
-    const { treasuryWallet } = await import("../solana/wallet");
-
-    txHash = await transferUSDC({
-      fromWallet: treasuryWallet,
-      toWallet: wallet,
-      amount,
+    console.info("[payout:service] Releasing escrow", {
+      escrowPda,
+      invoiceId,
     });
+
+    const releaseResult = await releaseEscrow({
+      invoiceId,
+      contractorWallet: wallet,
+    });
+
+    txHash = releaseResult.signature;
   } catch (error) {
     await prisma.payout.update({
       where: { id: payout.id },
@@ -168,8 +178,9 @@ export async function executePayout(
 
     if (
       error instanceof InvalidWalletAddressError ||
-      error instanceof InsufficientBalanceError ||
-      error instanceof SolanaTransferError
+      error instanceof EscrowNotFoundError ||
+      error instanceof EscrowAlreadyReleasedError ||
+      error instanceof EscrowReleaseError
     ) {
       throw error;
     }
@@ -186,6 +197,7 @@ export async function executePayout(
       data: {
         status: "CONFIRMED",
         txSignature: txHash,
+        escrowPda,
         executedAt: new Date(),
       },
     });

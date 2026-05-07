@@ -5,9 +5,12 @@ import {
   PayoutValidationError,
 } from "../../../../lib/services/payout.service";
 import {
-  InsufficientBalanceError,
+  EscrowAlreadyReleasedError,
+  EscrowNotFoundError,
+  EscrowReleaseError,
+} from "../../../../lib/solana/escrow";
+import {
   InvalidWalletAddressError,
-  SolanaTransferError,
 } from "../../../../lib/solana/transfer";
 
 type ExecutePayoutRequestBody = {
@@ -46,14 +49,15 @@ function getStatusCode(error: unknown): number {
     return 409;
   }
 
-  if (error instanceof InsufficientBalanceError) {
-    return 400;
+  if (error instanceof EscrowNotFoundError) {
+    return 404;
   }
 
-  if (
-    error instanceof SolanaTransferError ||
-    error instanceof PayoutExecutionError
-  ) {
+  if (error instanceof EscrowAlreadyReleasedError) {
+    return 409;
+  }
+
+  if (error instanceof EscrowReleaseError || error instanceof PayoutExecutionError) {
     return 502;
   }
 
