@@ -11,12 +11,14 @@ model Payout {
   invoiceId        String
   contractorWallet String
   amountUsdc       Float
+  escrowPda        String?
   txSignature      String?
   status           String
   createdAt        DateTime  @default(now())
   executedAt       DateTime?
 
   @@unique([invoiceId])
+  @@index([escrowPda])
   @@index([status])
   @@index([contractorWallet])
 }
