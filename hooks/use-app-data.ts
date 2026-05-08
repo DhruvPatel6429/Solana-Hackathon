@@ -28,6 +28,7 @@ export function useInvoiceActions() {
     mutationFn: api.approveInvoice,
     onSuccess: () => {
       pushToast({ type: "success", message: "Invoice approved and escrow release queued." });
+      api.reportUsage("invoice", "invoice-approval").catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
@@ -47,6 +48,9 @@ export function useExecutePayouts() {
   const pushToast = useAppStore((state) => state.pushToast);
   return useMutation({
     mutationFn: api.executePayouts,
-    onSuccess: (data) => pushToast({ type: "success", message: `Batch payout executed: ${data.txSignature.slice(0, 8)}...` }),
+    onSuccess: (data) => {
+      api.reportUsage("payout", data.txSignature).catch(() => undefined);
+      pushToast({ type: "success", message: `Batch payout executed: ${data.txSignature.slice(0, 8)}...` });
+    },
   });
 }

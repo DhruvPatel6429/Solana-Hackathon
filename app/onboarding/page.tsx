@@ -22,7 +22,7 @@ export default function OnboardingPage() {
   async function checkout(tier: string) {
     const result = await api.checkout(tier);
     pushToast({ type: "info", message: `Dodo checkout ready for ${tier}.` });
-    window.history.replaceState(null, "", result.url);
+    window.location.href = result.url;
   }
 
   return (

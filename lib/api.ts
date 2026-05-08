@@ -84,6 +84,7 @@ export const api = {
   rejectInvoice: (id: string, reason: string) =>
     fetchJson<{ success: boolean }>(`/api/invoices/${id}/reject`, { method: "PATCH", body: JSON.stringify({ reason }) }, { success: true }),
   executePayouts: () => fetchJson<{ txSignature: string }>("/api/payouts/execute", { method: "POST" }, { txSignature: "5J7mV8fYbLr1pU35Hk3wPHajYxXbhJ8QX7WdUkbMc3mQ" }),
+<<<<<<< HEAD
   payouts: (params?: AuditQuery) => fetchJson<Payout[]>(`/api/payouts${buildAuditQuery(params)}`, undefined, payouts),
   exportAudit: (params?: AuditQuery) => fetchJson<Payout[]>(`/api/audit/export${buildAuditQuery(params)}`, undefined, payouts),
   downloadAuditCsv: async (params?: AuditQuery) => {
@@ -126,7 +127,15 @@ export const api = {
     }
   },
   reportUsage: () => fetchJson<void>("/api/billing/report-usage", { method: "POST" }, undefined),
+=======
+  exportAudit: () => fetchJson<Payout[]>("/api/audit/export", undefined, payouts),
+>>>>>>> e07b30c (Member-1 updated)
   checkout: (tier: string) =>
-    fetchJson<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ tier }) }, { url: `/onboarding?checkout=${tier}` }),
-  fxRates: () => fallback(fxRates.map((rate) => ({ ...rate, refreshedAt: new Date().toLocaleTimeString() }))),
+    fetchJson<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ tier, companyId: "company_demo_01" }) }, { url: `/onboarding?checkout=${tier}` }),
+  fxRates: async () => {
+    await api.reportUsage("fx_quote", "fx-refresh");
+    return fallback(fxRates.map((rate) => ({ ...rate, refreshedAt: new Date().toLocaleTimeString() })));
+  },
+  reportUsage: (eventType: "invoice" | "payout" | "fx_quote" = "payout", referenceId?: string) =>
+    fetchJson<void>("/api/billing/report-usage", { method: "POST", body: JSON.stringify({ eventType, referenceId, companyId: "company_demo_01" }) }, undefined),
 };
