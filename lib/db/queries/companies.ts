@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 type CreateOrGetCompanyInput = {
   userId: string;
   companyName?: string;
@@ -7,7 +9,7 @@ type CreateOrGetCompanyInput = {
 };
 
 export async function getCompanyForUser(userId: string) {
-  return prisma.companyUser.findUnique({
+  return db.companyUser.findUnique({
     where: { userId },
     select: {
       id: true,
@@ -28,7 +30,7 @@ export async function createOrGetCompanyForUser({
   companyName,
   planTier,
 }: CreateOrGetCompanyInput) {
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx: any) => {
     const existingMembership = await tx.companyUser.findUnique({
       where: { userId },
       select: {

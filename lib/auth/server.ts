@@ -4,6 +4,8 @@ import type { JsonWebKey } from "node:crypto";
 import { serverEnv } from "@/config/env";
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 type JwtHeader = {
   alg?: string;
   kid?: string;
@@ -245,7 +247,7 @@ export async function requireTenantContext(
   request: Request,
 ): Promise<TenantContext> {
   const user = await requireAuthenticatedUser(request);
-  const membership = await prisma.companyUser.findUnique({
+  const membership = await db.companyUser.findUnique({
     where: { userId: user.userId },
     select: { id: true, companyId: true },
   });

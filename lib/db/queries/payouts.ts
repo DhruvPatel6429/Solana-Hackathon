@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 export type PayoutListItem = {
   id: string;
   contractor: string;
@@ -81,7 +83,7 @@ export async function listPayoutsByCompany(
   companyId: string,
   filters?: PayoutListFilters,
 ): Promise<PayoutListItem[]> {
-  const payouts = await prisma.payout.findMany({
+  const payouts = await db.payout.findMany({
     where: {
       companyId,
       status: "CONFIRMED",
@@ -104,8 +106,8 @@ export async function listPayoutsByCompany(
   });
 
   const rows = payouts
-    .filter((payout) => Boolean(payout.txSignature))
-    .map((payout) => ({
+    .filter((payout: any) => Boolean(payout.txSignature))
+    .map((payout: any) => ({
       id: payout.id,
       contractor:
         payout.contractor?.name ??

@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 type CreateAuditLogInput = {
   companyId: string;
   action: string;
@@ -15,7 +17,7 @@ export async function createAuditLog({
   actorUserId,
   metadata,
 }: CreateAuditLogInput) {
-  return prisma.auditLog.create({
+  return db.auditLog.create({
     data: {
       companyId,
       action,
@@ -26,7 +28,7 @@ export async function createAuditLog({
 }
 
 export async function listAuditLogsByCompany(companyId: string, limit = 100) {
-  return prisma.auditLog.findMany({
+  return db.auditLog.findMany({
     where: { companyId },
     orderBy: { createdAt: "desc" },
     take: limit,
