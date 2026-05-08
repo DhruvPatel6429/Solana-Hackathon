@@ -26,7 +26,15 @@ function parseFilters(request: Request): PayoutListFilters {
 export async function GET(request: Request) {
   const filters = parseFilters(request);
 
-  if (!process.env.DATABASE_URL || !request.headers.get("authorization")) {
+  if (!request.headers.get("authorization")) {
+    const { AuthenticationError } = await import("@/lib/auth/server");
+    const { toHttpErrorResponse } = await import("@/lib/auth/http");
+    return toHttpErrorResponse(
+      new AuthenticationError("Missing Authorization header."),
+    );
+  }
+
+  if (!process.env.DATABASE_URL) {
     const query = filters.search?.trim().toLowerCase();
     const rows = payouts.filter((payout) => {
       if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;

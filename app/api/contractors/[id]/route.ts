@@ -322,7 +322,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
       data: {
         companyId: auth.companyId,
         action: "CONTRACTOR_DELETED",
-        actorId: auth.userId,
+        actorUserId: auth.userId,
         metadata: {
           contractorId: id,
           name: contractor.name,
