@@ -6,6 +6,24 @@ datasource db {
   provider = "postgresql"
 }
 
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum PayoutPreference {
+  USDC
+  FIAT
+}
+
+enum InvoiceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
 model Company {
   id                   String       @id @default(cuid())
   name                 String
@@ -37,10 +55,12 @@ model Contractor {
   id               String    @id @default(cuid())
   companyId        String
   name             String
+  email            String    @default("")
   country          String?
   taxId            String?
   payoutPreference String    @default("USDC")
   walletAddress    String?
+  preferredFiatCurrency String?
   kycStatus        String    @default("PENDING")
   status           String    @default("Active")
   createdAt        DateTime  @default(now())
@@ -61,12 +81,15 @@ model Invoice {
   status       String    @default("PENDING")
   invoiceHash  String?
   description  String?
+  notes        String?
+  rejectionReason String?
   submittedAt  DateTime  @default(now())
   approvedAt   DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  payouts      Payout[]
 
   @@index([companyId])
   @@index([contractorId])
@@ -88,6 +111,7 @@ model Payout {
   executedAt       DateTime?
   company          Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contractor       Contractor? @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@unique([invoiceId])
   @@index([companyId])

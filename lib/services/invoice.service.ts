@@ -148,7 +148,7 @@ export async function listInvoices(filter: ListInvoicesFilter) {
       where,
       include: {
         contractor: { select: { id: true, name: true, country: true } },
-        payouts: { select: { id: true, solanaTxSignature: true, status: true } },
+        payouts: { select: { id: true, txSignature: true, status: true } },
       },
       orderBy: { submittedAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -157,7 +157,14 @@ export async function listInvoices(filter: ListInvoicesFilter) {
   ]);
 
   return {
-    invoices,
+    invoices: invoices.map((invoice) => ({
+      ...invoice,
+      payouts: invoice.payouts.map((payout) => ({
+        id: payout.id,
+        solanaTxSignature: payout.txSignature,
+        status: payout.status,
+      })),
+    })),
     pagination: {
       total,
       page,
@@ -210,7 +217,7 @@ export async function approveInvoice(input: ApproveInvoiceInput) {
     data: {
       companyId: invoice.companyId,
       action: "INVOICE_APPROVED",
-      actorId: adminId,
+      actorUserId: adminId,
       metadata: {
         invoiceId,
         contractorId: invoice.contractorId,
@@ -263,7 +270,7 @@ export async function rejectInvoice(input: RejectInvoiceInput) {
     data: {
       companyId: invoice.companyId,
       action: "INVOICE_REJECTED",
-      actorId: adminId,
+      actorUserId: adminId,
       metadata: {
         invoiceId,
         contractorId: invoice.contractorId,

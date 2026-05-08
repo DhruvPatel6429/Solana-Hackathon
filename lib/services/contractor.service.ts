@@ -116,7 +116,7 @@ export async function onboardContractor(input: OnboardContractorInput) {
     data: {
       companyId: input.companyId,
       action: "CONTRACTOR_ONBOARDED",
-      actorId: contractor.id,
+      actorUserId: contractor.id,
       metadata: {
         contractorId: contractor.id,
         name: contractor.name,
@@ -281,7 +281,7 @@ export async function updateKycStatus(
     data: {
       companyId,
       action: "KYC_STATUS_UPDATED",
-      actorId: adminId,
+      actorUserId: adminId,
       metadata: {
         contractorId,
         previousStatus: contractor.kycStatus,
