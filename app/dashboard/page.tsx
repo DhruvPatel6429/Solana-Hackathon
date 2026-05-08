@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Copy, ExternalLink, Globe2, Plus, Search, TrendingUp, Wallet, Zap } from "lucide-react";
+import { Activity, BadgeDollarSign, CheckCircle2, Clock3, Copy, ExternalLink, Globe2, Landmark, Plus, RadioTower, Search, ShieldCheck, TrendingUp, Wallet, Zap } from "lucide-react";
 import { FadeIn } from "@/components/animated";
 import { AppShell } from "@/components/app-shell";
 import { Sparkline } from "@/components/charts";
@@ -31,6 +31,19 @@ const statusTone = {
   Paused: "red",
 } as const;
 
+const commandMetrics = [
+  { label: "Approval SLA", value: "0.8 days", icon: Clock3, helper: "42% faster this month" },
+  { label: "Policy automation", value: "0%", icon: ShieldCheck, helper: "Rules below 2,500 USDC" },
+  { label: "Dodo usage", value: "31 units", icon: BadgeDollarSign, helper: "Invoices, payouts, FX quotes" },
+  { label: "Webhook health", value: "99.9%", icon: Activity, helper: "Last event verified" },
+];
+
+const integrationStack = [
+  { label: "Dodo checkout", status: "Active", icon: Landmark },
+  { label: "Usage metering", status: "Reporting", icon: BadgeDollarSign },
+  { label: "Solana devnet", status: "Connected", icon: RadioTower },
+];
+
 export default function DashboardPage() {
   const { data: treasuryData, isLoading: treasuryLoading } = useTreasuryBalance();
   const { data: contractors = [], isLoading: contractorsLoading } = useContractors();
@@ -41,6 +54,7 @@ export default function DashboardPage() {
   const [invoiceTab, setInvoiceTab] = useState("Pending");
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [contractorPage, setContractorPage] = useState(1);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -50,6 +64,9 @@ export default function DashboardPage() {
     const matchesStatus = statusFilter === "All" || contractor.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const pageSize = 5;
+  const totalContractorPages = Math.max(1, Math.ceil(filteredContractors.length / pageSize));
+  const paginatedContractors = filteredContractors.slice((contractorPage - 1) * pageSize, contractorPage * pageSize);
   const shownInvoices = invoiceData.filter((invoice) => invoice.status === invoiceTab);
   const payoutQueue = invoiceData.filter((invoice) => invoice.status === "Approved");
   const monthSpend = invoiceData.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + invoice.amount, 0);
@@ -63,17 +80,86 @@ export default function DashboardPage() {
     ],
     [contractors, contractorsLoading, invoiceData, invoicesLoading, monthSpend, treasuryData?.balance, treasuryLoading],
   );
+  const approvalRate = Math.round((invoiceData.filter((invoice) => invoice.status === "Approved" || invoice.status === "Paid").length / invoiceData.length) * 100);
 
   return (
     <AppShell>
-      <div className="space-y-6 px-4 py-6 md:px-8">
+      <div className="premium-grid space-y-6 px-4 py-6 md:px-8">
         <FadeIn>
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <p className="metric-label">Business dashboard</p>
-              <h1 className="mt-2 text-3xl font-bold">Treasury command center</h1>
+          <div className="overflow-hidden rounded-lg border border-white/10 bg-[#101018]/90 p-5 shadow-2xl shadow-black/20">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Badge tone="emerald">Devnet settlement ready</Badge>
+                  <Badge tone="violet">Dodo billing active</Badge>
+                  <Badge tone="blue">USDC treasury funded</Badge>
+                </div>
+                <p className="metric-label">Business dashboard</p>
+                <h1 className="mt-2 text-4xl font-extrabold">Treasury command center</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+                  Approve invoices, meter Dodo usage, execute Solana payouts, and export audit-ready proof from one finance cockpit.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="ghost">
+                  <RadioTower className="h-4 w-4" />
+                  Sync rates
+                </Button>
+                <Button onClick={() => setTopUpOpen(true)}>Top Up Treasury</Button>
+              </div>
             </div>
-            <Button onClick={() => setTopUpOpen(true)}>Top Up Treasury</Button>
+            <div className="mt-6 grid gap-3 md:grid-cols-4">
+              {commandMetrics.map((metric) => {
+                const TypedIcon = metric.icon;
+                const value = metric.label === "Policy automation" ? `${approvalRate}%` : metric.value;
+                return (
+                  <div key={metric.label} className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="metric-label">{metric.label}</p>
+                      <TypedIcon className="h-4 w-4 text-violet-300" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold">{value}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{metric.helper}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </FadeIn>
+
+        <FadeIn delay={0.03}>
+          <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+            <div>
+              <Card className="shine h-full">
+                <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+                  <div>
+                    <p className="metric-label">Demo moment for judges</p>
+                    <h2 className="mt-2 text-2xl font-bold">Execute a 3-recipient payout batch and watch usage billing record automatically.</h2>
+                    <p className="mt-3 text-sm leading-6 text-zinc-400">
+                      The dashboard ties the product story together: Dodo subscription, USDC treasury, invoice approval, Solana proof, and compliance export.
+                    </p>
+                  </div>
+                  <Button onClick={() => executePayouts.mutate()} disabled={executePayouts.isPending}>
+                    <Zap className="h-4 w-4" />
+                    Run judge demo
+                  </Button>
+                </div>
+              </Card>
+            </div>
+            <Card>
+              <p className="metric-label">Integration stack</p>
+              <div className="mt-4 space-y-3">
+                {integrationStack.map((item) => {
+                  const TypedIcon = item.icon;
+                  return (
+                    <div key={item.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                      <span className="flex items-center gap-2 text-sm text-zinc-300"><TypedIcon className="h-4 w-4 text-violet-300" />{item.label}</span>
+                      <Badge tone="emerald">{item.status}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
           </div>
         </FadeIn>
 
@@ -82,10 +168,12 @@ export default function DashboardPage() {
             const Icon = stat.icon;
             return (
               <FadeIn key={stat.label} delay={index * 0.04}>
-                <Card>
+                <Card className="shine min-h-44">
                   <div className="mb-4 flex items-center justify-between">
-                    <Icon className="h-5 w-5 text-violet-300" />
-                    {stat.label === "Pending Invoices" && <span className="h-2 w-2 rounded-full bg-amber-400" />}
+                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-500/10 ring-1 ring-violet-400/20">
+                      <Icon className="h-5 w-5 text-violet-300" />
+                    </div>
+                    {stat.label === "Pending Invoices" && <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]" />}
                   </div>
                   <p className="metric-label">{stat.label}</p>
                   {stat.value ? <p className="mt-3 text-2xl font-bold">{stat.value}</p> : <Skeleton className="mt-3 h-8 w-32" />}
@@ -97,33 +185,60 @@ export default function DashboardPage() {
           })}
         </div>
 
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Treasury Panel</CardTitle>
-              <p className="mt-1 text-sm text-zinc-400">Solana USDC wallet and recent funding activity</p>
-            </div>
-            <Button onClick={() => setTopUpOpen(true)}>Top Up Treasury</Button>
-          </CardHeader>
-          <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="metric-label">Wallet address</p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-sm">
-                {truncateHash(treasuryData?.wallet ?? treasury.wallet, 12, 8)}
-                <Button size="icon" variant="ghost" onClick={() => navigator.clipboard.writeText(treasuryData?.wallet ?? treasury.wallet)}><Copy className="h-4 w-4" /></Button>
-                <Link href={`https://explorer.solana.com/address/${treasuryData?.wallet ?? treasury.wallet}?cluster=devnet`} target="_blank"><ExternalLink className="h-4 w-4 text-zinc-400" /></Link>
+        <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Treasury Panel</CardTitle>
+                <p className="mt-1 text-sm text-zinc-400">Solana USDC wallet, treasury runway, and recent funding activity</p>
+              </div>
+              <Button onClick={() => setTopUpOpen(true)}>Top Up Treasury</Button>
+            </CardHeader>
+            <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="metric-label">Wallet address</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-sm">
+                  {truncateHash(treasuryData?.wallet ?? treasury.wallet, 12, 8)}
+                  <Button size="icon" variant="ghost" onClick={() => navigator.clipboard.writeText(treasuryData?.wallet ?? treasury.wallet)}><Copy className="h-4 w-4" /></Button>
+                  <Link href={`https://explorer.solana.com/address/${treasuryData?.wallet ?? treasury.wallet}?cluster=devnet`} target="_blank"><ExternalLink className="h-4 w-4 text-zinc-400" /></Link>
+                </div>
+                <div className="mt-6 rounded-lg bg-emerald-500/10 p-4">
+                  <p className="text-sm text-emerald-200">Runway estimate</p>
+                  <p className="mt-2 text-3xl font-bold">5.8 months</p>
+                  <p className="mt-1 text-xs text-zinc-500">Based on current monthly payout velocity</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {treasury.topUps.map((topUp) => (
+                  <div key={topUp.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                    <div><p className="font-medium">{formatUSDC(topUp.amount)}</p><p className="text-zinc-500">{topUp.source}</p></div>
+                    <span className="text-zinc-400">{topUp.date}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="space-y-3">
-              {treasury.topUps.map((topUp) => (
-                <div key={topUp.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                  <div><p className="font-medium">{formatUSDC(topUp.amount)}</p><p className="text-zinc-500">{topUp.source}</p></div>
-                  <span className="text-zinc-400">{topUp.date}</span>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Risk Monitor</CardTitle>
+            </CardHeader>
+            <div className="space-y-4">
+              {[
+                ["KYC completion", "87%", "6 verified, 1 pending, 1 rejected"],
+                ["Treasury utilization", "42%", "Healthy for next payout cycle"],
+                ["Invoice risk", "Low", "Only 4 pending review items"],
+              ].map(([label, value, helper]) => (
+                <div key={label} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="metric-label">{label}</p>
+                    <Badge tone={value === "Low" ? "emerald" : "violet"}>{value}</Badge>
+                  </div>
+                  <p className="mt-3 text-sm text-zinc-400">{helper}</p>
                 </div>
               ))}
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         <Card id="contractors">
           <CardHeader>
@@ -131,14 +246,14 @@ export default function DashboardPage() {
             <Button onClick={() => setInviteOpen(true)}><Plus className="h-4 w-4" />Add Contractor</Button>
           </CardHeader>
           <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px]">
-            <Input placeholder="Search contractors" value={search} onChange={(event) => setSearch(event.target.value)} />
-            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All</option><option>Active</option><option>Invited</option><option>Paused</option></Select>
+            <Input placeholder="Search contractors" value={search} onChange={(event) => { setSearch(event.target.value); setContractorPage(1); }} />
+            <Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setContractorPage(1); }}><option>All</option><option>Active</option><option>Invited</option><option>Paused</option></Select>
           </div>
           <div className="scrollbar-soft overflow-x-auto">
             <Table>
               <thead><tr><Th>Name</Th><Th>Country</Th><Th>Payout</Th><Th>KYC</Th><Th>Last Paid</Th><Th>Status</Th><Th>Actions</Th></tr></thead>
               <tbody>
-                {filteredContractors.map((contractor) => (
+                {paginatedContractors.map((contractor) => (
                   <tr key={contractor.id}>
                     <Td><div className="flex items-center gap-3"><Avatar name={contractor.name} />{contractor.name}</div></Td>
                     <Td>{contractor.flag} {contractor.country}</Td>
@@ -151,6 +266,13 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </Table>
+          </div>
+          <div className="mt-4 flex items-center justify-between text-sm text-zinc-400">
+            <span>Page {contractorPage} of {totalContractorPages} - {filteredContractors.length} contractors</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" disabled={contractorPage === 1} onClick={() => setContractorPage((page) => Math.max(1, page - 1))}>Previous</Button>
+              <Button size="sm" variant="ghost" disabled={contractorPage === totalContractorPages} onClick={() => setContractorPage((page) => Math.min(totalContractorPages, page + 1))}>Next</Button>
+            </div>
           </div>
         </Card>
 
@@ -177,7 +299,7 @@ export default function DashboardPage() {
 
           <Card id="payouts">
             <CardHeader><CardTitle>Payout Queue</CardTitle><Button onClick={() => executePayouts.mutate()} disabled={executePayouts.isPending}><Zap className="h-4 w-4" />Execute Batch Payout</Button></CardHeader>
-            <p className="mb-4 text-sm text-zinc-400">Estimated gas fee: 0.00021 SOL · {payoutQueue.length} recipients</p>
+            <p className="mb-4 text-sm text-zinc-400">Estimated gas fee: 0.00021 SOL - {payoutQueue.length} recipients</p>
             <div className="space-y-3">
               {payoutQueue.map((invoice) => (
                 <div key={invoice.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4">

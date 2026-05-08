@@ -22,6 +22,7 @@ body {
   background:
     radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.16), transparent 30rem),
     radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.12), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28rem),
     #0a0a0f;
 }
 
@@ -48,6 +49,37 @@ textarea {
 
 .violet-glow {
   box-shadow: 0 0 20px #7c3aed40;
+}
+
+.hero-console {
+  background:
+    linear-gradient(#101018, #101018) padding-box,
+    linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(16, 185, 129, 0.4)) border-box;
+}
+
+.premium-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  transform: translateX(-60%) rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transition: transform 700ms ease;
+}
+
+.shine:hover::after {
+  transform: translateX(60%) rotate(18deg);
 }
 
 .hero-number {

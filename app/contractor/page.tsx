@@ -34,7 +34,7 @@ export default function ContractorPortalPage() {
             <Progress value={step * 33.33} className="my-6" />
             {step === 1 && <div className="grid gap-3 md:grid-cols-3"><Input placeholder="Legal name" /><Select><option>IN India</option><option>SG Singapore</option><option>BR Brazil</option><option>PH Philippines</option></Select><Input placeholder="Tax ID" /></div>}
             {step === 2 && <div className="grid gap-4 md:grid-cols-2"><button onClick={() => setPreference("USDC")} className="rounded-lg border border-violet-400 bg-violet-500/10 p-5 text-left"><Wallet className="mb-3 h-8 w-8" />USDC Wallet</button><button onClick={() => setPreference("FIAT")} className="rounded-lg border border-white/10 bg-white/5 p-5 text-left">Local Currency</button>{preference === "USDC" ? <Button>Connect Phantom / Solflare</Button> : <Input placeholder="Bank account number" />}</div>}
-            {step === 3 && <div className="rounded-lg border border-white/10 bg-white/5 p-5"><p className="font-medium">Review payout profile</p><p className="mt-2 text-sm text-zinc-400">Maya Chen · Singapore · {preference} payout</p></div>}
+            {step === 3 && <div className="rounded-lg border border-white/10 bg-white/5 p-5"><p className="font-medium">Review payout profile</p><p className="mt-2 text-sm text-zinc-400">Maya Chen - Singapore - {preference} payout</p></div>}
             <div className="mt-6 flex justify-between"><Button variant="ghost" disabled={step === 1} onClick={() => setStep(step - 1)}>Back</Button><Button onClick={() => step === 3 ? setOnboarding(false) : setStep(step + 1)}>{step === 3 ? "Confirm" : "Continue"}</Button></div>
           </Card>
         ) : (
