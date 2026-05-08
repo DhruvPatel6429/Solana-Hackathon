@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import type { Payout } from "@prisma/client";
 
 import { prisma } from "../db/prisma";
+import { logPayoutConfirmed, logPayoutFailed } from "./audit.service";
 import {
   deriveEscrowPda,
   EscrowAlreadyReleasedError,
@@ -119,10 +120,19 @@ export async function executePayout(
 
   let payout: Payout;
   const escrowPda = deriveEscrowPda(invoiceId).escrowPda.toBase58();
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    select: {
+      companyId: true,
+      contractorId: true,
+    },
+  });
 
   try {
     payout = await prisma.payout.create({
       data: {
+        companyId: invoice?.companyId,
+        contractorId: invoice?.contractorId,
         invoiceId,
         contractorWallet: wallet,
         amountUsdc: amount,
@@ -168,6 +178,19 @@ export async function executePayout(
 
     const message = getErrorMessage(error);
 
+    if (invoice?.companyId) {
+      await logPayoutFailed({
+        companyId: invoice.companyId,
+        metadata: {
+          payoutId: payout.id,
+          invoiceId,
+          wallet,
+          amount,
+          error: message,
+        },
+      }).catch(() => undefined);
+    }
+
     console.error("[payout:service] Payout failed", {
       payoutId: payout.id,
       invoiceId,
@@ -207,6 +230,17 @@ export async function executePayout(
       invoiceId,
       txHash,
     });
+
+    if (invoice?.companyId) {
+      await logPayoutConfirmed({
+        companyId: invoice.companyId,
+        metadata: {
+          payoutId: payout.id,
+          invoiceId,
+          txHash,
+        },
+      }).catch(() => undefined);
+    }
 
     return {
       payoutId: payout.id,
