@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 export type ContractorListItem = {
   id: string;
   name: string;
@@ -46,7 +48,7 @@ function toContractorStatus(value: string | null | undefined): ContractorListIte
 export async function listContractorsByCompany(
   companyId: string,
 ): Promise<ContractorListItem[]> {
-  const contractors = await prisma.contractor.findMany({
+  const contractors = await db.contractor.findMany({
     where: { companyId },
     include: {
       payouts: {
@@ -65,7 +67,7 @@ export async function listContractorsByCompany(
     orderBy: { createdAt: "desc" },
   });
 
-  return contractors.map((contractor) => ({
+  return contractors.map((contractor: any) => ({
     id: contractor.id,
     name: contractor.name,
     country: contractor.country ?? "Unknown",

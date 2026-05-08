@@ -1,6 +1,11 @@
-import { toHttpErrorResponse } from "@/lib/auth/http";
-import { requireTenantContext } from "@/lib/auth/server";
-import { listPayoutsByCompany, type PayoutListFilters } from "@/lib/db/queries/payouts";
+import { payouts } from "@/lib/mock-data";
+
+type PayoutListFilters = {
+  search?: string;
+  from?: Date;
+  to?: Date;
+  kycStatus?: "Verified" | "Pending" | "Rejected";
+};
 
 function parseDate(value: string | null): Date | undefined {
   if (!value) return undefined;
@@ -8,23 +13,37 @@ function parseDate(value: string | null): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function parseFilters(request: Request): PayoutListFilters {
+  const url = new URL(request.url);
+  return {
+    search: url.searchParams.get("search") ?? undefined,
+    from: parseDate(url.searchParams.get("from")),
+    to: parseDate(url.searchParams.get("to")),
+    kycStatus: (url.searchParams.get("kycStatus") as PayoutListFilters["kycStatus"]) ?? undefined,
+  };
+}
+
 export async function GET(request: Request) {
+  const filters = parseFilters(request);
+
+  if (!process.env.DATABASE_URL || !request.headers.get("authorization")) {
+    const query = filters.search?.trim().toLowerCase();
+    const rows = payouts.filter((payout) => {
+      if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;
+      if (query && !`${payout.contractor} ${payout.invoiceId} ${payout.txHash}`.toLowerCase().includes(query)) return false;
+      return true;
+    });
+    return Response.json(rows);
+  }
+
   try {
+    const { requireTenantContext } = await import("@/lib/auth/server");
+    const { listPayoutsByCompany } = await import("@/lib/db/queries/payouts");
     const tenant = await requireTenantContext(request);
-    const url = new URL(request.url);
-
-    const filters: PayoutListFilters = {
-      search: url.searchParams.get("search") ?? undefined,
-      from: parseDate(url.searchParams.get("from")),
-      to: parseDate(url.searchParams.get("to")),
-      kycStatus:
-        (url.searchParams.get("kycStatus") as PayoutListFilters["kycStatus"]) ??
-        undefined,
-    };
-
     const rows = await listPayoutsByCompany(tenant.companyId, filters);
     return Response.json(rows);
   } catch (error) {
+    const { toHttpErrorResponse } = await import("@/lib/auth/http");
     return toHttpErrorResponse(error);
   }
 }

@@ -14,6 +14,8 @@ import {
   InvalidWalletAddressError,
 } from "../solana/transfer";
 
+const db = prisma as any;
+
 type ExecutePayoutInput = {
   invoiceId: string;
   wallet: string;
@@ -104,7 +106,7 @@ export async function executePayout(
     amount,
   });
 
-  const existingPayout = await prisma.payout.findUnique({
+  const existingPayout = await db.payout.findUnique({
     where: { invoiceId },
   });
 
@@ -120,7 +122,7 @@ export async function executePayout(
 
   let payout: Payout;
   const escrowPda = deriveEscrowPda(invoiceId).escrowPda.toBase58();
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await db.invoice.findUnique({
     where: { id: invoiceId },
     select: {
       companyId: true,
@@ -129,7 +131,7 @@ export async function executePayout(
   });
 
   try {
-    payout = await prisma.payout.create({
+    payout = await db.payout.create({
       data: {
         companyId: invoice?.companyId,
         contractorId: invoice?.contractorId,

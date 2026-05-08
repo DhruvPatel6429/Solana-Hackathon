@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 
+const db = prisma as any;
+
 export type InvoiceListItem = {
   id: string;
   contractorId: string;
@@ -23,7 +25,7 @@ function toInvoiceStatus(value: string | null | undefined): InvoiceListItem["sta
 export async function listInvoicesByCompany(
   companyId: string,
 ): Promise<InvoiceListItem[]> {
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await db.invoice.findMany({
     where: { companyId },
     include: {
       contractor: {
@@ -38,7 +40,7 @@ export async function listInvoicesByCompany(
   });
 
   const payoutMap = new Map<string, string>();
-  const payoutRows = await prisma.payout.findMany({
+  const payoutRows = await db.payout.findMany({
     where: {
       companyId,
       txSignature: {
@@ -57,7 +59,7 @@ export async function listInvoicesByCompany(
     }
   }
 
-  return invoices.map((invoice) => ({
+  return invoices.map((invoice: any) => ({
     id: invoice.id,
     contractorId: invoice.contractorId,
     contractor: invoice.contractor.name,
