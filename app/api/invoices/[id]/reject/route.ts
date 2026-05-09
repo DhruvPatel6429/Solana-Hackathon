@@ -20,67 +20,33 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
 import { rejectInvoice } from "@/lib/services/invoice.service";
 
-// ─── Auth helper ──────────────────────────────────────────────────────────────
+function getClaimedRole(claims: Record<string, unknown>): string | undefined {
+  const appMetadata = claims.app_metadata;
+  const userMetadata = claims.user_metadata;
 
-interface CallerIdentity {
-  userId: string;
-  companyId: string;
-  role: "admin" | "contractor";
-}
-
-async function requireAdminAuth(req: NextRequest): Promise<CallerIdentity> {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw NextResponse.json(
-      { error: "Missing or malformed Authorization header" },
-      { status: 401 }
-    );
+  if (
+    typeof appMetadata === "object" &&
+    appMetadata !== null &&
+    "role" in appMetadata
+  ) {
+    return String(appMetadata.role);
   }
 
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw NextResponse.json(
-      { error: "Unauthorized — invalid or expired token" },
-      { status: 401 }
-    );
+  if (
+    typeof userMetadata === "object" &&
+    userMetadata !== null &&
+    "role" in userMetadata
+  ) {
+    return String(userMetadata.role);
   }
 
-  const meta = user.user_metadata ?? {};
-  const companyId = meta.companyId as string | undefined;
-
-  if (!companyId) {
-    throw NextResponse.json(
-      { error: "Account is not associated with a company" },
-      { status: 403 }
-    );
-  }
-
-  const role = (meta.role as "admin" | "contractor") ?? "contractor";
-
-  if (role !== "admin") {
-    throw NextResponse.json(
-      { error: "Only admins can reject invoices" },
-      { status: 403 }
-    );
-  }
-
-  return { userId: user.id, companyId, role };
+  return undefined;
 }
 
 // ─── Email helper ─────────────────────────────────────────────────────────────
@@ -163,12 +129,20 @@ interface RouteContext {
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   // ── 1. Auth — admin only ──────────────────────────────────────────────────
-  let caller: CallerIdentity;
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    caller = await requireAdminAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
+  }
+
+  const role = getClaimedRole(tenant.claims);
+  if (role && role !== "admin") {
+    return NextResponse.json(
+      { error: "Only admins can reject invoices" },
+      { status: 403 },
+    );
   }
 
   const { id: invoiceId } = params;
@@ -211,8 +185,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     invoice = await rejectInvoice({
       invoiceId,
+      companyId: tenant.companyId,
       reason,
-      adminId: caller.userId,
+      adminId: tenant.userId,
     });
   } catch (err) {
     const message =

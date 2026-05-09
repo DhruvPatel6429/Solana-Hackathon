@@ -9,9 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { KycStatus, PayoutPreference } from "@prisma/client";
 
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
 import {
   getContractorById,
   updateContractor,
@@ -19,53 +20,6 @@ import {
   type UpdateContractorInput,
 } from "@/lib/services/contractor.service";
 import { prisma } from "@/lib/db/prisma";
-
-// ─── Auth helper ──────────────────────────────────────────────────────────────
-
-/**
- * Validates the Supabase JWT and returns the caller's userId + companyId.
- * Throws a ready-to-return NextResponse on failure.
- */
-async function requireCompanyAuth(
-  req: NextRequest
-): Promise<{ userId: string; companyId: string }> {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw NextResponse.json(
-      { error: "Missing or malformed Authorization header" },
-      { status: 401 }
-    );
-  }
-
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw NextResponse.json(
-      { error: "Unauthorized — invalid or expired token" },
-      { status: 401 }
-    );
-  }
-
-  const companyId = user.user_metadata?.companyId as string | undefined;
-  if (!companyId) {
-    throw NextResponse.json(
-      { error: "Account is not associated with a company" },
-      { status: 403 }
-    );
-  }
-
-  return { userId: user.id, companyId };
-}
 
 // ─── Route params type ────────────────────────────────────────────────────────
 
@@ -95,12 +49,12 @@ interface RouteContext {
  * }
  */
 export async function GET(req: NextRequest, { params }: RouteContext) {
-  let auth: { userId: string; companyId: string };
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    auth = await requireCompanyAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   const { id } = params;
@@ -112,7 +66,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const contractor = await getContractorById(id, auth.companyId);
+    const contractor = await getContractorById(id, tenant.companyId);
     return NextResponse.json({ contractor }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
@@ -143,12 +97,12 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
  * { contractor: UpdatedContractor }
  */
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  let auth: { userId: string; companyId: string };
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    auth = await requireCompanyAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   const { id } = params;
@@ -188,9 +142,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
       const contractor = await updateKycStatus(
         id,
-        auth.companyId,
+        tenant.companyId,
         body.kycStatus as KycStatus,
-        auth.userId
+        tenant.userId
       );
 
       return NextResponse.json({ contractor }, { status: 200 });
@@ -232,7 +186,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     const input: UpdateContractorInput = {
       contractorId: id,
-      companyId: auth.companyId,
+      companyId: tenant.companyId,
       ...(body.name !== undefined && { name: body.name as string }),
       ...(body.country !== undefined && { country: body.country as string }),
       ...(body.taxId !== undefined && { taxId: body.taxId as string }),
@@ -280,12 +234,12 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
  * { message: "Contractor deleted successfully" }
  */
 export async function DELETE(req: NextRequest, { params }: RouteContext) {
-  let auth: { userId: string; companyId: string };
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    auth = await requireCompanyAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   const { id } = params;
@@ -298,11 +252,12 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
 
   try {
     // Verify the contractor exists and belongs to this company
-    const contractor = await getContractorById(id, auth.companyId);
+    const contractor = await getContractorById(id, tenant.companyId);
 
     // Block deletion if any invoices are still open
     const openInvoiceCount = await prisma.invoice.count({
       where: {
+        companyId: tenant.companyId,
         contractorId: id,
         status: { in: ["PENDING", "APPROVED"] },
       },
@@ -320,9 +275,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     // Write audit log before deletion (the row won't exist after)
     await prisma.auditLog.create({
       data: {
-        companyId: auth.companyId,
+        companyId: tenant.companyId,
         action: "CONTRACTOR_DELETED",
-        actorUserId: auth.userId,
+        actorUserId: tenant.userId,
         metadata: {
           contractorId: id,
           name: contractor.name,

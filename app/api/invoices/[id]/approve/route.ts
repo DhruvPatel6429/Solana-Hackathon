@@ -117,6 +117,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       invoiceId,
       wallet,
       amount: Number(invoice.amountUsdc),
+      companyId: tenant.companyId,
     });
 
     return NextResponse.json({

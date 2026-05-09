@@ -18,6 +18,13 @@ describe("invoice lifecycle", () => {
     const company = await prisma.company.create({
       data: { id: "company_invoice_flow", name: "Invoice Flow Co" },
     });
+    await prisma.companyUser.create({
+      data: {
+        id: "membership_invoice_flow",
+        companyId: company.id,
+        userId: "test-admin",
+      },
+    });
     const contractor = await prisma.contractor.create({
       data: {
         id: "contractor_invoice_flow",
@@ -41,7 +48,10 @@ describe("invoice lifecycle", () => {
     const response = await PATCH(
       new Request("http://localhost:3000/api/invoices/approve", {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test:test-admin",
+        },
         body: JSON.stringify({ invoiceId: invoice.id }),
       }),
     );

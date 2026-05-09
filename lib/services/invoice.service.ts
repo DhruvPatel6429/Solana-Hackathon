@@ -25,6 +25,7 @@ export interface LineItem {
 
 export interface RejectInvoiceInput {
   invoiceId: string;
+  companyId: string;
   reason: string;
   adminId: string;
 }
@@ -73,6 +74,18 @@ function computeInvoiceHash(input: CreateInvoiceInput): string {
  * arithmetic errors. Input is a number but converted to string for Prisma.
  */
 export async function createInvoice(input: CreateInvoiceInput) {
+  const contractor = await prisma.contractor.findFirst({
+    where: {
+      id: input.contractorId,
+      companyId: input.companyId,
+    },
+    select: { id: true },
+  });
+
+  if (!contractor) {
+    throw new Error(`Contractor ${input.contractorId} not found`);
+  }
+
   const invoiceHash = computeInvoiceHash(input);
 
   const invoice = await prisma.invoice.create({
@@ -238,10 +251,13 @@ export async function approveInvoice(input: ApproveInvoiceInput) {
  * Caller should send the rejection email notification after this returns.
  */
 export async function rejectInvoice(input: RejectInvoiceInput) {
-  const { invoiceId, reason, adminId } = input;
+  const { invoiceId, companyId, reason, adminId } = input;
 
-  const existing = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
+  const existing = await prisma.invoice.findFirst({
+    where: {
+      id: invoiceId,
+      companyId,
+    },
     include: { contractor: true },
   });
 

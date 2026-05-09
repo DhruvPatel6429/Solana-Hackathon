@@ -11,6 +11,7 @@ type ExecutePayoutInput = {
   invoiceId: string;
   wallet: string;
   amount: number;
+  companyId?: string;
 };
 
 type ExecutePayoutResult = {
@@ -106,6 +107,10 @@ export async function executePayout(
   const invoiceId = input.invoiceId.trim();
   const wallet = input.wallet.trim();
   const amount = input.amount;
+  const expectedCompanyId =
+    typeof input.companyId === "string" && input.companyId.trim()
+      ? input.companyId.trim()
+      : undefined;
 
   console.info("[payout:service] Received payout execution request", {
     invoiceId,
@@ -158,6 +163,10 @@ export async function executePayout(
   });
 
   if (!invoice) {
+    throw new PayoutInvoiceNotFoundError(invoiceId);
+  }
+
+  if (expectedCompanyId && invoice.companyId !== expectedCompanyId) {
     throw new PayoutInvoiceNotFoundError(invoiceId);
   }
 

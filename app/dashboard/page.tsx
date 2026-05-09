@@ -6,6 +6,7 @@ import { Activity, BadgeDollarSign, CheckCircle2, Clock3, Copy, ExternalLink, Gl
 import { FadeIn } from "@/components/animated";
 import { AppShell } from "@/components/app-shell";
 import { Sparkline } from "@/components/charts";
+import { JudgeDemoPanel } from "@/components/judge-demo-panel";
 import { Skeleton } from "@/components/skeleton";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -162,6 +163,8 @@ export default function DashboardPage() {
             </Card>
           </div>
         </FadeIn>
+
+        <JudgeDemoPanel />
 
         <div className="grid gap-4 lg:grid-cols-4">
           {stats.map((stat, index) => {

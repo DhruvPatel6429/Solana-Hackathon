@@ -1,3 +1,9 @@
+import { NextResponse } from "next/server";
+
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
+import { prisma } from "@/lib/db/prisma";
+
 type ExecutePayoutRequestBody = {
   invoiceId?: unknown;
   wallet?: unknown;
@@ -5,6 +11,8 @@ type ExecutePayoutRequestBody = {
   amount?: unknown;
   amountUsdc?: unknown;
 };
+
+const db = prisma as any;
 
 function errorResponse(message: string, status: number): Response {
   return Response.json(
@@ -45,7 +53,46 @@ function getStatusCode(error: unknown): number {
   return 500;
 }
 
+function getClaimedRole(claims: Record<string, unknown>): string | undefined {
+  const appMetadata = claims.app_metadata;
+  const userMetadata = claims.user_metadata;
+
+  if (
+    typeof appMetadata === "object" &&
+    appMetadata !== null &&
+    "role" in appMetadata
+  ) {
+    return String(appMetadata.role);
+  }
+
+  if (
+    typeof userMetadata === "object" &&
+    userMetadata !== null &&
+    "role" in userMetadata
+  ) {
+    return String(userMetadata.role);
+  }
+
+  return undefined;
+}
+
 export async function POST(request: Request): Promise<Response> {
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
+
+  try {
+    tenant = await requireTenantContext(request);
+  } catch (error) {
+    return toHttpErrorResponse(error);
+  }
+
+  const role = getClaimedRole(tenant.claims);
+  if (role && role !== "admin") {
+    return NextResponse.json(
+      { success: false, error: "Only admins can execute payouts." },
+      { status: 403 },
+    );
+  }
+
   let body: ExecutePayoutRequestBody;
 
   try {
@@ -56,21 +103,35 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const { executePayout } = await import("../../../../lib/services/payout.service");
-    const wallet = typeof body.wallet === "string"
-      ? body.wallet
-      : typeof body.walletAddress === "string"
-        ? body.walletAddress
-        : "";
-    const amount = typeof body.amount === "number"
-      ? body.amount
-      : typeof body.amountUsdc === "number"
-        ? body.amountUsdc
-        : Number.NaN;
+    const invoiceId = typeof body.invoiceId === "string" ? body.invoiceId.trim() : "";
+    if (!invoiceId) {
+      return errorResponse("invoiceId is required.", 400);
+    }
+
+    const invoice = await db.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        companyId: tenant.companyId,
+      },
+      include: {
+        contractor: true,
+      },
+    });
+
+    if (!invoice) {
+      return errorResponse(`Invoice ${invoiceId} not found.`, 404);
+    }
+
+    const wallet = invoice.contractor?.walletAddress;
+    if (!wallet) {
+      return errorResponse("Contractor wallet address is missing.", 400);
+    }
 
     const result = await executePayout({
-      invoiceId: typeof body.invoiceId === "string" ? body.invoiceId : "",
+      invoiceId,
       wallet,
-      amount,
+      amount: Number(invoice.amountUsdc),
+      companyId: tenant.companyId,
     });
 
     return Response.json({

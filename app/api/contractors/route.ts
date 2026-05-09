@@ -8,63 +8,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { KycStatus, PayoutPreference } from "@prisma/client";
 
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
 import {
   onboardContractor,
   listContractors,
   type OnboardContractorInput,
 } from "@/lib/services/contractor.service";
-
-// ─── Auth helper ──────────────────────────────────────────────────────────────
-
-/**
- * Validates the Supabase JWT from the Authorization header and returns the
- * authenticated user's companyId (stored in user_metadata by M4's signup flow).
- *
- * Throws a NextResponse with 401 if auth fails.
- */
-async function requireCompanyAuth(
-  req: NextRequest
-): Promise<{ userId: string; companyId: string }> {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw NextResponse.json(
-      { error: "Missing or malformed Authorization header" },
-      { status: 401 }
-    );
-  }
-
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw NextResponse.json(
-      { error: "Unauthorized — invalid or expired token" },
-      { status: 401 }
-    );
-  }
-
-  const companyId = user.user_metadata?.companyId as string | undefined;
-  if (!companyId) {
-    throw NextResponse.json(
-      { error: "Account is not associated with a company" },
-      { status: 403 }
-    );
-  }
-
-  return { userId: user.id, companyId };
-}
 
 // ─── POST /api/contractors ────────────────────────────────────────────────────
 
@@ -86,12 +38,12 @@ async function requireCompanyAuth(
  * { contractor: Contractor }
  */
 export async function POST(req: NextRequest) {
-  let auth: { userId: string; companyId: string };
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    auth = await requireCompanyAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   let body: Record<string, unknown>;
@@ -127,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 
   const input: OnboardContractorInput = {
-    companyId: auth.companyId,
+    companyId: tenant.companyId,
     name: body.name as string,
     email: body.email as string,
     country: body.country as string,
@@ -174,12 +126,12 @@ export async function POST(req: NextRequest) {
  * }
  */
 export async function GET(req: NextRequest) {
-  let auth: { userId: string; companyId: string };
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
 
   try {
-    auth = await requireCompanyAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    tenant = await requireTenantContext(req);
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   const { searchParams } = new URL(req.url);
@@ -209,7 +161,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await listContractors({
-      companyId: auth.companyId,
+      companyId: tenant.companyId,
       kycStatus,
       page,
       pageSize,
