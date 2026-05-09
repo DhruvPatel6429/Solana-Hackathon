@@ -108,7 +108,7 @@ export async function installPrismaTestDb(): Promise<{
   prisma: any;
   restore: () => void;
 }> {
-  process.env.NODE_ENV = "test";
+  Object.assign(process.env, { NODE_ENV: "test" as string });
   process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 
   const { prisma } = await import("../../lib/db/prisma");
