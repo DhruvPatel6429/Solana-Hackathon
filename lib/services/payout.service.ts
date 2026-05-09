@@ -3,16 +3,7 @@ import type { Payout } from "@prisma/client";
 
 import { prisma } from "../db/prisma";
 import { logPayoutConfirmed, logPayoutFailed } from "./audit.service";
-import {
-  deriveEscrowPda,
-  EscrowAlreadyReleasedError,
-  EscrowNotFoundError,
-  EscrowReleaseError,
-  releaseEscrow,
-} from "../solana/escrow";
-import {
-  InvalidWalletAddressError,
-} from "../solana/transfer";
+import { InvalidWalletAddressError, transferUSDC } from "../solana/transfer";
 
 const db = prisma as any;
 
@@ -39,6 +30,13 @@ export class DuplicatePayoutError extends Error {
   constructor(invoiceId: string) {
     super(`Payout has already been created for invoice ${invoiceId}.`);
     this.name = "DuplicatePayoutError";
+  }
+}
+
+export class PayoutInvoiceNotFoundError extends Error {
+  constructor(invoiceId: string) {
+    super(`Invoice ${invoiceId} not found.`);
+    this.name = "PayoutInvoiceNotFoundError";
   }
 }
 
@@ -91,6 +89,15 @@ function validateInput({ invoiceId, wallet, amount }: ExecutePayoutInput): void 
   }
 }
 
+function getMockSolanaSignature(): string | undefined {
+  if (process.env.NODE_ENV !== "test") {
+    return undefined;
+  }
+
+  const signature = process.env.MOCK_SOLANA_TX_SIGNATURE?.trim();
+  return signature || undefined;
+}
+
 export async function executePayout(
   input: ExecutePayoutInput,
 ): Promise<ExecutePayoutResult> {
@@ -110,7 +117,26 @@ export async function executePayout(
     where: { invoiceId },
   });
 
-  if (existingPayout) {
+  if (existingPayout?.status === "CONFIRMED" && existingPayout.txSignature) {
+    console.info("[payout:service] Returning existing confirmed payout", {
+      invoiceId,
+      payoutId: existingPayout.id,
+      txSignature: existingPayout.txSignature,
+    });
+
+    await db.invoice.update({
+      where: { id: invoiceId },
+      data: { status: "PAID" },
+    });
+
+    return {
+      payoutId: existingPayout.id,
+      txHash: existingPayout.txSignature,
+      status: "CONFIRMED",
+    };
+  }
+
+  if (existingPayout?.status === "PENDING") {
     console.warn("[payout:service] Duplicate payout blocked", {
       invoiceId,
       payoutId: existingPayout.id,
@@ -121,27 +147,54 @@ export async function executePayout(
   }
 
   let payout: Payout;
-  const escrowPda = deriveEscrowPda(invoiceId).escrowPda.toBase58();
   const invoice = await db.invoice.findUnique({
     where: { id: invoiceId },
     select: {
       companyId: true,
       contractorId: true,
+      status: true,
+      approvedAt: true,
     },
   });
 
+  if (!invoice) {
+    throw new PayoutInvoiceNotFoundError(invoiceId);
+  }
+
+  if (!["PENDING", "APPROVED"].includes(invoice.status)) {
+    throw new PayoutValidationError(
+      `Invoice ${invoiceId} is ${invoice.status}; only PENDING or APPROVED invoices can be paid.`,
+    );
+  }
+
   try {
-    payout = await db.payout.create({
-      data: {
-        companyId: invoice?.companyId,
-        contractorId: invoice?.contractorId,
-        invoiceId,
-        contractorWallet: wallet,
-        amountUsdc: amount.toString(),
-        escrowPda,
-        status: "PENDING",
-      },
-    });
+    if (existingPayout?.status === "FAILED") {
+      payout = await db.payout.update({
+        where: { id: existingPayout.id },
+        data: {
+          companyId: invoice.companyId,
+          contractorId: invoice.contractorId,
+          contractorWallet: wallet,
+          amountUsdc: amount.toString(),
+          currency: "USDC",
+          status: "PENDING",
+          txSignature: null,
+          executedAt: null,
+        },
+      });
+    } else {
+      payout = await db.payout.create({
+        data: {
+          companyId: invoice.companyId,
+          contractorId: invoice.contractorId,
+          invoiceId,
+          contractorWallet: wallet,
+          amountUsdc: amount.toString(),
+          currency: "USDC",
+          status: "PENDING",
+        },
+      });
+    }
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       throw new DuplicatePayoutError(invoiceId);
@@ -159,17 +212,25 @@ export async function executePayout(
   let txHash: string;
 
   try {
-    console.info("[payout:service] Releasing escrow", {
-      escrowPda,
+    console.info("[payout:service] Executing treasury USDC transfer", {
       invoiceId,
+      payoutId: payout.id,
+      wallet,
+      amount,
     });
 
-    const releaseResult = await releaseEscrow({
-      invoiceId,
-      contractorWallet: wallet,
-    });
+    const mockSignature = getMockSolanaSignature();
 
-    txHash = releaseResult.signature;
+    if (mockSignature) {
+      txHash = mockSignature;
+    } else {
+      const { treasuryWallet } = await import("../solana/wallet");
+      txHash = await transferUSDC({
+        fromWallet: treasuryWallet,
+        toWallet: wallet,
+        amount,
+      });
+    }
   } catch (error) {
     await prisma.payout.update({
       where: { id: payout.id },
@@ -180,7 +241,7 @@ export async function executePayout(
 
     const message = getErrorMessage(error);
 
-    if (invoice?.companyId) {
+    if (invoice.companyId) {
       await logPayoutFailed({
         companyId: invoice.companyId,
         metadata: {
@@ -201,12 +262,7 @@ export async function executePayout(
       error: message,
     });
 
-    if (
-      error instanceof InvalidWalletAddressError ||
-      error instanceof EscrowNotFoundError ||
-      error instanceof EscrowAlreadyReleasedError ||
-      error instanceof EscrowReleaseError
-    ) {
+    if (error instanceof InvalidWalletAddressError) {
       throw error;
     }
 
@@ -217,15 +273,25 @@ export async function executePayout(
   }
 
   try {
-    await prisma.payout.update({
-      where: { id: payout.id },
-      data: {
-        status: "CONFIRMED",
-        txSignature: txHash,
-        escrowPda,
-        executedAt: new Date(),
-      },
-    });
+    const paidAt = new Date();
+
+    await prisma.$transaction([
+      db.payout.update({
+        where: { id: payout.id },
+        data: {
+          status: "CONFIRMED",
+          txSignature: txHash,
+          executedAt: paidAt,
+        },
+      }),
+      db.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          status: "PAID",
+          approvedAt: invoice.approvedAt ?? paidAt,
+        },
+      }),
+    ]);
 
     console.info("[payout:service] Payout confirmed", {
       payoutId: payout.id,
@@ -233,7 +299,7 @@ export async function executePayout(
       txHash,
     });
 
-    if (invoice?.companyId) {
+    if (invoice.companyId) {
       await logPayoutConfirmed({
         companyId: invoice.companyId,
         metadata: {
@@ -263,7 +329,7 @@ export async function executePayout(
     );
 
     throw new PayoutExecutionError(
-      `Payout transaction finalized, but the database confirmation update failed. txHash=${txHash}. ${message}`,
+      `Payout transaction confirmed, but the database confirmation update failed. txHash=${txHash}. ${message}`,
       {
         payoutId: payout.id,
         cause: error,

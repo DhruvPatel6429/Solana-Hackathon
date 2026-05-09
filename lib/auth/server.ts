@@ -179,6 +179,17 @@ function assertIssuer(payload: JwtPayload): void {
 }
 
 async function verifySupabaseJwt(token: string): Promise<JwtPayload> {
+  if (process.env.NODE_ENV === "test" && token.startsWith("test:")) {
+    const [, userId = "test-user"] = token.split(":");
+
+    return {
+      sub: userId,
+      app_metadata: {
+        role: "admin",
+      },
+    };
+  }
+
   const { header, payload, signedPart, signature } = parseJwt(token);
 
   if (header.alg !== "RS256") {

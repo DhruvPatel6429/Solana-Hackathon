@@ -1,7 +1,9 @@
 type ExecutePayoutRequestBody = {
   invoiceId?: unknown;
   wallet?: unknown;
+  walletAddress?: unknown;
   amount?: unknown;
+  amountUsdc?: unknown;
 };
 
 function errorResponse(message: string, status: number): Response {
@@ -32,16 +34,12 @@ function getStatusCode(error: unknown): number {
     return 409;
   }
 
-  if (name.includes("EscrowNotFound")) {
+  if (name.includes("PayoutInvoiceNotFound")) {
     return 404;
   }
 
-  if (name.includes("EscrowAlreadyReleased")) {
-    return 409;
-  }
-
-  if (name.includes("EscrowRelease") || name.includes("PayoutExecution")) {
-    return 502;
+  if (name.includes("PayoutExecution") || name.includes("SolanaTransfer")) {
+    return 500;
   }
 
   return 500;
@@ -58,15 +56,33 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const { executePayout } = await import("../../../../lib/services/payout.service");
+    const wallet = typeof body.wallet === "string"
+      ? body.wallet
+      : typeof body.walletAddress === "string"
+        ? body.walletAddress
+        : "";
+    const amount = typeof body.amount === "number"
+      ? body.amount
+      : typeof body.amountUsdc === "number"
+        ? body.amountUsdc
+        : Number.NaN;
+
     const result = await executePayout({
       invoiceId: typeof body.invoiceId === "string" ? body.invoiceId : "",
-      wallet: typeof body.wallet === "string" ? body.wallet : "",
-      amount: typeof body.amount === "number" ? body.amount : Number.NaN,
+      wallet,
+      amount,
     });
 
     return Response.json({
       success: true,
       txHash: result.txHash,
+      txSignature: result.txHash,
+      payout: {
+        id: result.payoutId,
+        status: result.status,
+        txSignature: result.txHash,
+        solanaTxSignature: result.txHash,
+      },
     });
   } catch (error) {
     const message = getErrorMessage(error);

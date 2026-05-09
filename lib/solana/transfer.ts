@@ -231,7 +231,7 @@ export async function transferUSDC({
       ),
     );
 
-    const latestBlockhash = await connection.getLatestBlockhash("finalized");
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
     transaction.feePayer = fromWallet.publicKey;
     transaction.recentBlockhash = latestBlockhash.blockhash;
     transaction.sign(fromWallet);
@@ -256,18 +256,18 @@ export async function transferUSDC({
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
       },
-      "finalized",
+      "confirmed",
     );
 
     if (confirmation.value.err) {
       throw new SolanaTransferError(
-        `[solana:transfer] Transaction failed during finalized confirmation: ${JSON.stringify(
+        `[solana:transfer] Transaction failed during confirmed confirmation: ${JSON.stringify(
           confirmation.value.err,
         )}`,
       );
     }
 
-    console.info("[solana:transfer] Transaction finalized", { signature });
+    console.info("[solana:transfer] Transaction confirmed", { signature });
     return signature;
   } catch (error) {
     if (error instanceof SolanaTransferError) {
