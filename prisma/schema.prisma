@@ -77,7 +77,7 @@ model Invoice {
   id           String    @id @default(cuid())
   companyId    String
   contractorId String
-  amountUsdc   Float
+  amountUsdc   Decimal
   status       String    @default("PENDING")
   invoiceHash  String?
   description  String?
@@ -102,7 +102,7 @@ model Payout {
   contractorId     String?
   invoiceId        String
   contractorWallet String
-  amountUsdc       Float
+  amountUsdc       Decimal
   currency         String    @default("USDC")
   escrowPda        String?
   txSignature      String?

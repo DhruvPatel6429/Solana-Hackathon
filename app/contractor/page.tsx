@@ -35,7 +35,7 @@ interface Contractor {
 
 interface Invoice {
   id: string;
-  amountUsdc: number;
+  amountUsdc: any; // Prisma Decimal type, convert with .toNumber()
   status: "PENDING" | "APPROVED" | "REJECTED" | "PAID";
   submittedAt: string;
   approvedAt: string | null;
@@ -255,8 +255,8 @@ export default function ContractorPortalPage() {
   }, [fetchInvoices]);
 
   // ── Derived stats ─────────────────────────────────────────────────────────
-  const totalEarned  = invoices.filter((i) => i.status === "PAID").reduce((s, i) => s + i.amountUsdc, 0);
-  const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + i.amountUsdc, 0);
+  const totalEarned  = invoices.filter((i) => i.status === "PAID").reduce((s, i) => s + (typeof i.amountUsdc === 'number' ? i.amountUsdc : i.amountUsdc.toNumber()), 0);
+  const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + (typeof i.amountUsdc === 'number' ? i.amountUsdc : i.amountUsdc.toNumber()), 0);
   const paidCount    = invoices.filter((i) => i.status === "PAID").length;
   const pendingCount = invoices.filter((i) => i.status === "PENDING").length;
 

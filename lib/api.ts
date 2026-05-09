@@ -76,7 +76,7 @@ function downloadTextFile(filename: string, content: string, mimeType: string) {
 }
 
 export const api = {
-  treasuryBalance: () => fetchJson<{ balance: number; wallet: string }>("/api/treasury/balance", undefined, treasury),
+  treasuryBalance: () => fetchJson<{ balance: number; wallet?: string; source: "solana" | "error"; error?: string }>("/api/treasury/balance", undefined, { balance: treasury.balance, wallet: treasury.wallet, source: "error", error: "Mock data" }),
   contractors: () => fetchJson<Contractor[]>("/api/contractors", undefined, contractors),
   invoices: () => fetchJson<Invoice[]>("/api/invoices", undefined, invoices),
   approveInvoice: (id: string) =>

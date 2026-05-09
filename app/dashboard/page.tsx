@@ -176,7 +176,18 @@ export default function DashboardPage() {
                     {stat.label === "Pending Invoices" && <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]" />}
                   </div>
                   <p className="metric-label">{stat.label}</p>
-                  {stat.value ? <p className="mt-3 text-2xl font-bold">{stat.value}</p> : <Skeleton className="mt-3 h-8 w-32" />}
+                  {stat.value ? (
+                    <div className="mt-3 flex items-center gap-2">
+                      <p className="text-2xl font-bold">{stat.value}</p>
+                      {stat.label === "Treasury Balance" && treasuryData?.source && (
+                        <Badge tone={treasuryData.source === "solana" ? "emerald" : "red"}>
+                          {treasuryData.source === "solana" ? "LIVE" : "ERROR"}
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <Skeleton className="mt-3 h-8 w-32" />
+                  )}
                   <div className="mt-3 flex items-center gap-2 text-xs text-emerald-300"><TrendingUp className="h-3 w-3" />{stat.helper}</div>
                   {stat.label === "This Month Spend" && <div className="mt-2"><Sparkline /></div>}
                 </Card>
@@ -196,12 +207,26 @@ export default function DashboardPage() {
             </CardHeader>
             <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="metric-label">Wallet address</p>
+                <div className="flex items-center justify-between">
+                  <p className="metric-label">Wallet address</p>
+                  {treasuryData?.source && (
+                    <Badge tone={treasuryData.source === "solana" ? "emerald" : "red"} className="text-xs">
+                      {treasuryData.source === "solana" ? "🟢 LIVE" : "🔴 ERROR"}
+                    </Badge>
+                  )}
+                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-sm">
                   {truncateHash(treasuryData?.wallet ?? treasury.wallet, 12, 8)}
                   <Button size="icon" variant="ghost" onClick={() => navigator.clipboard.writeText(treasuryData?.wallet ?? treasury.wallet)}><Copy className="h-4 w-4" /></Button>
                   <Link href={`https://explorer.solana.com/address/${treasuryData?.wallet ?? treasury.wallet}?cluster=devnet`} target="_blank"><ExternalLink className="h-4 w-4 text-zinc-400" /></Link>
                 </div>
+                {treasuryData?.source === "error" && treasuryData?.error && (
+                  <div className="mt-4 rounded-lg bg-rose-500/10 border border-rose-500/30 p-3">
+                    <p className="text-xs text-rose-200">
+                      <span className="font-semibold">Error fetching balance:</span> {treasuryData.error}
+                    </p>
+                  </div>
+                )}
                 <div className="mt-6 rounded-lg bg-emerald-500/10 p-4">
                   <p className="text-sm text-emerald-200">Runway estimate</p>
                   <p className="mt-2 text-3xl font-bold">5.8 months</p>

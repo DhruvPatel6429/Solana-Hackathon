@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Invoice" ALTER COLUMN "amountUsdc" SET DATA TYPE DECIMAL(65,30);
+
+-- AlterTable
+ALTER TABLE "Payout" ALTER COLUMN "amountUsdc" SET DATA TYPE DECIMAL(65,30);

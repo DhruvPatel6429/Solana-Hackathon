@@ -68,6 +68,9 @@ function computeInvoiceHash(input: CreateInvoiceInput): string {
  * Create a new invoice.
  * Computes a SHA-256 hash of the invoice content and stores it for
  * proof-of-invoice anchoring.
+ *
+ * Note: amountUsdc is stored as Decimal in the database to avoid floating-point
+ * arithmetic errors. Input is a number but converted to string for Prisma.
  */
 export async function createInvoice(input: CreateInvoiceInput) {
   const invoiceHash = computeInvoiceHash(input);
@@ -76,7 +79,7 @@ export async function createInvoice(input: CreateInvoiceInput) {
     data: {
       contractorId: input.contractorId,
       companyId: input.companyId,
-      amountUsdc: input.amountUsdc,
+      amountUsdc: input.amountUsdc.toString(),
       status: InvoiceStatus.PENDING,
       invoiceHash,
       submittedAt: new Date(),

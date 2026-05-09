@@ -137,7 +137,7 @@ export async function executePayout(
         contractorId: invoice?.contractorId,
         invoiceId,
         contractorWallet: wallet,
-        amountUsdc: amount,
+        amountUsdc: amount.toString(),
         escrowPda,
         status: "PENDING",
       },
