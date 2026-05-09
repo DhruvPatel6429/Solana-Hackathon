@@ -8,73 +8,45 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
 import { getInvoiceById } from "@/lib/services/invoice.service";
 
-// ─── Auth helper ──────────────────────────────────────────────────────────────
+type CallerRole = "admin" | "contractor";
 
-/**
- * Caller identity resolved from the Supabase JWT.
- *
- * role:
- *   "admin"      — company finance admin; can view any invoice in their company
- *   "contractor" — can only view their own invoices
- *
- * companyId is always present.
- * contractorId is only present when role === "contractor".
- */
-interface CallerIdentity {
-  userId: string;
-  companyId: string;
-  role: "admin" | "contractor";
+type CallerIdentity = Awaited<ReturnType<typeof requireTenantContext>> & {
+  role: CallerRole;
   contractorId?: string;
+};
+
+function getNestedClaimRecord(
+  claims: Record<string, unknown>,
+  key: "app_metadata" | "user_metadata",
+): Record<string, unknown> | undefined {
+  const raw = claims[key];
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  return raw as Record<string, unknown>;
 }
 
-async function requireAuth(req: NextRequest): Promise<CallerIdentity> {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw NextResponse.json(
-      { error: "Missing or malformed Authorization header" },
-      { status: 401 }
-    );
-  }
+function getCallerRole(claims: Record<string, unknown>): CallerRole {
+  const appMetadata = getNestedClaimRecord(claims, "app_metadata");
+  const userMetadata = getNestedClaimRecord(claims, "user_metadata");
+  const claimedRole = appMetadata?.role ?? userMetadata?.role;
+  return claimedRole === "admin" ? "admin" : "contractor";
+}
 
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    throw NextResponse.json(
-      { error: "Unauthorized — invalid or expired token" },
-      { status: 401 }
-    );
-  }
-
-  const meta = user.user_metadata ?? {};
-
-  const companyId = meta.companyId as string | undefined;
-  if (!companyId) {
-    throw NextResponse.json(
-      { error: "Account is not associated with a company" },
-      { status: 403 }
-    );
-  }
-
-  return {
-    userId: user.id,
-    companyId,
-    role: (meta.role as "admin" | "contractor") ?? "contractor",
-    contractorId: meta.contractorId as string | undefined,
-  };
+function getContractorIdFromClaims(
+  claims: Record<string, unknown>,
+): string | undefined {
+  const appMetadata = getNestedClaimRecord(claims, "app_metadata");
+  const userMetadata = getNestedClaimRecord(claims, "user_metadata");
+  const rawContractorId = appMetadata?.contractorId ?? userMetadata?.contractorId;
+  return typeof rawContractorId === "string" && rawContractorId.trim()
+    ? rawContractorId.trim()
+    : undefined;
 }
 
 // ─── Route params type ────────────────────────────────────────────────────────
@@ -126,9 +98,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   let caller: CallerIdentity;
 
   try {
-    caller = await requireAuth(req);
-  } catch (errorResponse) {
-    return errorResponse as NextResponse;
+    const tenant = await requireTenantContext(req);
+    caller = {
+      ...tenant,
+      role: getCallerRole(tenant.claims),
+      contractorId: getContractorIdFromClaims(tenant.claims),
+    };
+  } catch (error) {
+    return toHttpErrorResponse(error);
   }
 
   // ── Param validation ──────────────────────────────────────────────────────

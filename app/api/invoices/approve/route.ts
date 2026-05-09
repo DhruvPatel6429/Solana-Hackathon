@@ -1,3 +1,7 @@
+import { NextResponse } from "next/server";
+
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { executePayout } from "@/lib/services/payout.service";
 
@@ -23,7 +27,46 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function getClaimedRole(claims: Record<string, unknown>): string | undefined {
+  const appMetadata = claims.app_metadata;
+  const userMetadata = claims.user_metadata;
+
+  if (
+    typeof appMetadata === "object" &&
+    appMetadata !== null &&
+    "role" in appMetadata
+  ) {
+    return String(appMetadata.role);
+  }
+
+  if (
+    typeof userMetadata === "object" &&
+    userMetadata !== null &&
+    "role" in userMetadata
+  ) {
+    return String(userMetadata.role);
+  }
+
+  return undefined;
+}
+
 export async function PATCH(request: Request) {
+  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
+
+  try {
+    tenant = await requireTenantContext(request);
+  } catch (error) {
+    return toHttpErrorResponse(error);
+  }
+
+  const role = getClaimedRole(tenant.claims);
+  if (role && role !== "admin") {
+    return NextResponse.json(
+      { success: false, error: "Only admins can approve invoices." },
+      { status: 403 },
+    );
+  }
+
   let body: ApproveInvoiceBody;
 
   try {
@@ -43,8 +86,11 @@ export async function PATCH(request: Request) {
     return errorResponse("invoiceId is required.", 400);
   }
 
-  const invoice = await db.invoice.findUnique({
-    where: { id: invoiceId },
+  const invoice = await db.invoice.findFirst({
+    where: {
+      id: invoiceId,
+      companyId: tenant.companyId,
+    },
     include: { contractor: true },
   });
 
@@ -78,6 +124,7 @@ export async function PATCH(request: Request) {
       invoiceId,
       wallet,
       amount: Number(invoice.amountUsdc),
+      companyId: tenant.companyId,
     });
 
     return Response.json({

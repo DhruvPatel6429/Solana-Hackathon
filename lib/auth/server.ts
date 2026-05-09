@@ -1,3 +1,4 @@
+// SINGLE SOURCE OF TRUTH FOR AUTH — all API routes must use this module
 import { createPublicKey, verify as verifySignature } from "node:crypto";
 import type { JsonWebKey } from "node:crypto";
 
