@@ -138,7 +138,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   }
 
   const role = getClaimedRole(tenant.claims);
-  if (role && role !== "admin") {
+  if (role !== "admin") {
     return NextResponse.json(
       { error: "Only admins can reject invoices" },
       { status: 403 },

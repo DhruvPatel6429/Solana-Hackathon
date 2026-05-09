@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   const role = getClaimedRole(tenant.claims);
-  if (role && role !== "admin") {
+  if (role !== "admin") {
     return NextResponse.json(
       { success: false, error: "Only admins can approve invoices." },
       { status: 403 },

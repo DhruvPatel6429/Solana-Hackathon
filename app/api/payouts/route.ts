@@ -35,6 +35,13 @@ export async function GET(request: Request) {
   }
 
   if (!process.env.DATABASE_URL) {
+    if (process.env.NODE_ENV === "production") {
+      return Response.json(
+        { error: "DATABASE_URL is required to list payouts." },
+        { status: 500 },
+      );
+    }
+
     const query = filters.search?.trim().toLowerCase();
     const rows = payouts.filter((payout) => {
       if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;

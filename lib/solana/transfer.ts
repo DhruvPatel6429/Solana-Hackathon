@@ -231,7 +231,7 @@ export async function transferUSDC({
       ),
     );
 
-    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+    const latestBlockhash = await connection.getLatestBlockhash("finalized");
     transaction.feePayer = fromWallet.publicKey;
     transaction.recentBlockhash = latestBlockhash.blockhash;
     transaction.sign(fromWallet);
@@ -243,7 +243,7 @@ export async function transferUSDC({
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       {
-        preflightCommitment: "confirmed",
+        preflightCommitment: "finalized",
         skipPreflight: false,
       },
     );
@@ -256,18 +256,18 @@ export async function transferUSDC({
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
       },
-      "confirmed",
+      "finalized",
     );
 
     if (confirmation.value.err) {
       throw new SolanaTransferError(
-        `[solana:transfer] Transaction failed during confirmed confirmation: ${JSON.stringify(
+        `[solana:transfer] Transaction failed during finalized confirmation: ${JSON.stringify(
           confirmation.value.err,
         )}`,
       );
     }
 
-    console.info("[solana:transfer] Transaction confirmed", { signature });
+    console.info("[solana:transfer] Transaction finalized", { signature });
     return signature;
   } catch (error) {
     if (error instanceof SolanaTransferError) {
@@ -442,7 +442,7 @@ export async function transferWithSplit({
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       {
-        preflightCommitment: "confirmed",
+        preflightCommitment: "finalized",
         skipPreflight: false,
       },
     );
@@ -653,7 +653,7 @@ export async function executeBatchPayout(
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       {
-        preflightCommitment: "confirmed",
+        preflightCommitment: "finalized",
         skipPreflight: false,
       },
     );

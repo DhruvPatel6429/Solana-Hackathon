@@ -34,7 +34,22 @@ function buildCsv(rows: typeof payouts) {
 export async function GET(request: Request) {
   const filters = parseFilters(request);
 
-  if (!process.env.DATABASE_URL || !request.headers.get("authorization")) {
+  if (!request.headers.get("authorization")) {
+    const { AuthenticationError } = await import("@/lib/auth/server");
+    const { toHttpErrorResponse } = await import("@/lib/auth/http");
+    return toHttpErrorResponse(
+      new AuthenticationError("Missing Authorization header."),
+    );
+  }
+
+  if (!process.env.DATABASE_URL) {
+    if (process.env.NODE_ENV === "production") {
+      return Response.json(
+        { error: "DATABASE_URL is required to export audit data." },
+        { status: 500 },
+      );
+    }
+
     const query = filters.search?.trim().toLowerCase();
     const rows = payouts.filter((payout) => {
       if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;

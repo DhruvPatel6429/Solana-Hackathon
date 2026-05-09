@@ -1,9 +1,9 @@
 import {
   AnchorProvider,
-  BN,
   Idl,
   Program,
 } from "@project-serum/anchor";
+import { createRequire } from "node:module";
 import {
   PublicKey,
   SYSVAR_RENT_PUBKEY,
@@ -17,10 +17,12 @@ import {
 } from "@solana/spl-token";
 
 import { connection } from "./connection";
-import { DEVNET_USDC_MINT } from "./tokens";
+import { DEVNET_USDC_MINT, getUSDCAccount, USDC_DECIMALS } from "./tokens";
 import { treasuryWallet } from "./wallet";
 
 const DEFAULT_ESCROW_PROGRAM_ID = "HukqmD9GfmVya8ASPrY7ELEmuJXy8PxA4Mvm7PsQEjgE";
+const require = createRequire(import.meta.url);
+const { BN } = require("@project-serum/anchor") as { BN: any };
 
 export const ESCROW_PROGRAM_ID = new PublicKey(
   process.env.ESCROW_PROGRAM_ID ?? DEFAULT_ESCROW_PROGRAM_ID,
@@ -30,6 +32,32 @@ const ESCROW_IDL = {
   version: "0.1.0",
   name: "escrow",
   instructions: [
+    {
+      name: "initializeEscrow",
+      accounts: [
+        { name: "authority", isMut: true, isSigner: true },
+        { name: "mint", isMut: false, isSigner: false },
+        { name: "escrow", isMut: true, isSigner: false },
+        { name: "vault", isMut: true, isSigner: false },
+        { name: "systemProgram", isMut: false, isSigner: false },
+        { name: "tokenProgram", isMut: false, isSigner: false },
+        { name: "associatedTokenProgram", isMut: false, isSigner: false },
+        { name: "rent", isMut: false, isSigner: false },
+      ],
+      args: [{ name: "invoiceId", type: { array: ["u8", 32] } }],
+    },
+    {
+      name: "deposit",
+      accounts: [
+        { name: "user", isMut: true, isSigner: true },
+        { name: "escrow", isMut: true, isSigner: false },
+        { name: "mint", isMut: false, isSigner: false },
+        { name: "userTokenAccount", isMut: true, isSigner: false },
+        { name: "vault", isMut: true, isSigner: false },
+        { name: "tokenProgram", isMut: false, isSigner: false },
+      ],
+      args: [{ name: "amount", type: "u64" }],
+    },
     {
       name: "release",
       accounts: [
@@ -80,7 +108,7 @@ type EscrowAccountData = {
   authority: PublicKey;
   mint: PublicKey;
   vault: PublicKey;
-  amount: BN;
+  amount: InstanceType<typeof BN>;
   isReleased: boolean;
   bump: number;
   invoiceId: number[];
@@ -89,6 +117,30 @@ type EscrowAccountData = {
 export type ReleaseEscrowParams = {
   invoiceId: string;
   contractorWallet: string;
+};
+
+export type InitializeEscrowParams = {
+  invoiceId: string;
+};
+
+export type InitializeEscrowResult = {
+  signature?: string;
+  escrowPda: string;
+  vault: string;
+  alreadyInitialized: boolean;
+};
+
+export type DepositEscrowParams = {
+  invoiceId: string;
+  amount: number | string;
+};
+
+export type DepositEscrowResult = {
+  signature?: string;
+  escrowPda: string;
+  vault: string;
+  amountBaseUnits: string;
+  alreadyFunded: boolean;
 };
 
 export type ReleaseEscrowResult = {
@@ -131,6 +183,13 @@ export class EscrowAlreadyReleasedError extends EscrowReleaseError {
   }
 }
 
+export class EscrowDepositError extends EscrowReleaseError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "EscrowDepositError";
+  }
+}
+
 class TreasuryAnchorWallet {
   public readonly publicKey = treasuryWallet.publicKey;
 
@@ -153,7 +212,7 @@ function getEscrowProgram(): Program {
     new TreasuryAnchorWallet() as any,
     {
       commitment: "finalized",
-      preflightCommitment: "confirmed",
+      preflightCommitment: "finalized",
       skipPreflight: false,
     },
   );
@@ -184,6 +243,43 @@ export function invoiceIdToBytes(invoiceId: string): Uint8Array {
   encoded.copy(bytes);
 
   return Uint8Array.from(bytes);
+}
+
+function toUSDCBaseUnits(amount: number | string): bigint {
+  const value = typeof amount === "number" ? amount.toString() : amount.trim();
+
+  if (!value) {
+    throw new EscrowDepositError("[solana:escrow] amount is required.");
+  }
+
+  if (value.includes("e") || value.includes("E")) {
+    throw new EscrowDepositError(
+      "[solana:escrow] amount must be a decimal value, not scientific notation.",
+    );
+  }
+
+  const match = value.match(/^(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+  if (!match) {
+    throw new EscrowDepositError(`[solana:escrow] Invalid USDC amount: ${value}`);
+  }
+
+  const whole = match[1] ?? "0";
+  const fraction = match[2] ?? match[3] ?? "";
+  if (fraction.length > USDC_DECIMALS) {
+    throw new EscrowDepositError(
+      `[solana:escrow] USDC supports ${USDC_DECIMALS} decimal places. Received ${fraction.length}.`,
+    );
+  }
+
+  const baseUnits =
+    BigInt(whole) * 10n ** BigInt(USDC_DECIMALS) +
+    BigInt(fraction.padEnd(USDC_DECIMALS, "0") || "0");
+
+  if (baseUnits <= 0n) {
+    throw new EscrowDepositError("[solana:escrow] amount must be greater than zero.");
+  }
+
+  return baseUnits;
 }
 
 export function deriveEscrowPda(invoiceId: string): {
@@ -240,7 +336,7 @@ async function fetchEscrowAccount(
 ): Promise<EscrowAccountData | null> {
   return (await (program.account as any).escrowAccount.fetchNullable(
     escrowPda,
-    "confirmed",
+    "finalized",
   )) as EscrowAccountData | null;
 }
 
@@ -284,6 +380,228 @@ export async function getEscrowStatus(invoiceId: string): Promise<EscrowStatus> 
     amount: escrowAccount.amount.toString(),
     isReleased: escrowAccount.isReleased,
   };
+}
+
+async function confirmFinalized(signature: string, label: string): Promise<void> {
+  const confirmation = await connection.confirmTransaction(signature, "finalized");
+
+  if (confirmation.value.err) {
+    throw new EscrowReleaseError(
+      `[solana:escrow] ${label} transaction failed during finalized confirmation: ${JSON.stringify(
+        confirmation.value.err,
+      )}`,
+    );
+  }
+}
+
+export async function initializeEscrow({
+  invoiceId,
+}: InitializeEscrowParams): Promise<InitializeEscrowResult> {
+  const program = getEscrowProgram();
+  const { escrowPda, invoiceIdBytes } = deriveEscrowPda(invoiceId);
+  const vault = getAssociatedTokenAddressSync(
+    DEVNET_USDC_MINT,
+    escrowPda,
+    true,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+
+  const existing = await fetchEscrowAccount(program, escrowPda);
+  if (existing) {
+    console.info("[solana:escrow] Escrow already initialized", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      vault: existing.vault.toBase58(),
+      amount: existing.amount.toString(),
+      isReleased: existing.isReleased,
+    });
+
+    if (existing.isReleased) {
+      throw new EscrowAlreadyReleasedError(invoiceId);
+    }
+
+    return {
+      escrowPda: escrowPda.toBase58(),
+      vault: existing.vault.toBase58(),
+      alreadyInitialized: true,
+    };
+  }
+
+  console.info("[solana:escrow] Initializing escrow", {
+    invoiceId,
+    escrowPda: escrowPda.toBase58(),
+    vault: vault.toBase58(),
+    mint: DEVNET_USDC_MINT.toBase58(),
+    authority: treasuryWallet.publicKey.toBase58(),
+  });
+
+  try {
+    const signature = await program.methods
+      .initializeEscrow(Array.from(invoiceIdBytes))
+      .accounts({
+        authority: treasuryWallet.publicKey,
+        mint: DEVNET_USDC_MINT,
+        escrow: escrowPda,
+        vault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([treasuryWallet])
+      .rpc({
+        commitment: "finalized",
+        preflightCommitment: "finalized",
+        skipPreflight: false,
+      });
+
+    await confirmFinalized(signature, "initialize escrow");
+
+    console.info("[solana:escrow] Escrow initialized", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      vault: vault.toBase58(),
+      signature,
+    });
+
+    return {
+      signature,
+      escrowPda: escrowPda.toBase58(),
+      vault: vault.toBase58(),
+      alreadyInitialized: false,
+    };
+  } catch (error) {
+    if (error instanceof EscrowReleaseError) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[solana:escrow] Escrow initialization failed", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      error: message,
+    });
+    throw new EscrowReleaseError(
+      `[solana:escrow] Failed to initialize escrow: ${message}`,
+      error,
+    );
+  }
+}
+
+export async function depositEscrow({
+  invoiceId,
+  amount,
+}: DepositEscrowParams): Promise<DepositEscrowResult> {
+  const amountBaseUnits = toUSDCBaseUnits(amount);
+  const program = getEscrowProgram();
+  const { escrowPda } = deriveEscrowPda(invoiceId);
+  const escrowAccount = await fetchEscrowAccount(program, escrowPda);
+
+  if (!escrowAccount) {
+    throw new EscrowNotFoundError(invoiceId, escrowPda);
+  }
+
+  if (escrowAccount.isReleased) {
+    throw new EscrowAlreadyReleasedError(invoiceId);
+  }
+
+  if (!escrowAccount.mint.equals(DEVNET_USDC_MINT)) {
+    throw new EscrowDepositError(
+      `[solana:escrow] Escrow mint ${escrowAccount.mint.toBase58()} does not match configured USDC mint ${DEVNET_USDC_MINT.toBase58()}.`,
+    );
+  }
+
+  const requiredAmount = new BN(amountBaseUnits.toString());
+
+  if (escrowAccount.amount.eq(requiredAmount)) {
+    console.info("[solana:escrow] Escrow already funded", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      existingAmount: escrowAccount.amount.toString(),
+      requiredAmount: amountBaseUnits.toString(),
+    });
+
+    return {
+      escrowPda: escrowPda.toBase58(),
+      vault: escrowAccount.vault.toBase58(),
+      amountBaseUnits: amountBaseUnits.toString(),
+      alreadyFunded: true,
+    };
+  }
+
+  if (escrowAccount.amount.gt(requiredAmount)) {
+    throw new EscrowDepositError(
+      `[solana:escrow] Escrow holds more than the invoice amount (${escrowAccount.amount.toString()} base units); refusing to release an overfunded escrow automatically.`,
+    );
+  }
+
+  if (escrowAccount.amount.gt(new BN(0))) {
+    throw new EscrowDepositError(
+      `[solana:escrow] Escrow is partially funded (${escrowAccount.amount.toString()} base units); refusing to deposit again automatically.`,
+    );
+  }
+
+  const userTokenAccount = getUSDCAccount(treasuryWallet.publicKey);
+
+  console.info("[solana:escrow] Depositing USDC into escrow", {
+    invoiceId,
+    escrowPda: escrowPda.toBase58(),
+    vault: escrowAccount.vault.toBase58(),
+    userTokenAccount: userTokenAccount.toBase58(),
+    amountBaseUnits: amountBaseUnits.toString(),
+  });
+
+  try {
+    const signature = await program.methods
+      .deposit(new BN(amountBaseUnits.toString()))
+      .accounts({
+        user: treasuryWallet.publicKey,
+        escrow: escrowPda,
+        mint: escrowAccount.mint,
+        userTokenAccount,
+        vault: escrowAccount.vault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([treasuryWallet])
+      .rpc({
+        commitment: "finalized",
+        preflightCommitment: "finalized",
+        skipPreflight: false,
+      });
+
+    await confirmFinalized(signature, "deposit escrow");
+
+    console.info("[solana:escrow] Escrow funded", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      signature,
+      amountBaseUnits: amountBaseUnits.toString(),
+    });
+
+    return {
+      signature,
+      escrowPda: escrowPda.toBase58(),
+      vault: escrowAccount.vault.toBase58(),
+      amountBaseUnits: amountBaseUnits.toString(),
+      alreadyFunded: false,
+    };
+  } catch (error) {
+    if (error instanceof EscrowReleaseError) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[solana:escrow] Escrow deposit failed", {
+      invoiceId,
+      escrowPda: escrowPda.toBase58(),
+      error: message,
+    });
+    throw new EscrowDepositError(
+      `[solana:escrow] Failed to deposit escrow funds: ${message}`,
+      error,
+    );
+  }
 }
 
 export async function releaseEscrow({
@@ -345,22 +663,11 @@ export async function releaseEscrow({
       .signers([treasuryWallet])
       .rpc({
         commitment: "finalized",
-        preflightCommitment: "confirmed",
+        preflightCommitment: "finalized",
         skipPreflight: false,
       });
 
-    const confirmation = await connection.confirmTransaction(
-      signature,
-      "finalized",
-    );
-
-    if (confirmation.value.err) {
-      throw new EscrowReleaseError(
-        `[solana:escrow] Release transaction failed during finalized confirmation: ${JSON.stringify(
-          confirmation.value.err,
-        )}`,
-      );
-    }
+    await confirmFinalized(signature, "release escrow");
 
     console.info("[solana:escrow] Escrow released", {
       invoiceId,

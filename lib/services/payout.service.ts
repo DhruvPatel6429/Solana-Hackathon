@@ -3,7 +3,7 @@ import type { Payout } from "@prisma/client";
 
 import { prisma } from "../db/prisma";
 import { logPayoutConfirmed, logPayoutFailed } from "./audit.service";
-import { InvalidWalletAddressError, transferUSDC } from "../solana/transfer";
+import { InvalidWalletAddressError } from "../solana/transfer";
 
 const db = prisma as any;
 
@@ -188,6 +188,7 @@ export async function executePayout(
           currency: "USDC",
           status: "PENDING",
           txSignature: null,
+          escrowPda: null,
           executedAt: null,
         },
       });
@@ -219,9 +220,10 @@ export async function executePayout(
   });
 
   let txHash: string;
+  let escrowPda: string | null = payout.escrowPda ?? null;
 
   try {
-    console.info("[payout:service] Executing treasury USDC transfer", {
+    console.info("[payout:service] Executing escrow-backed payout", {
       invoiceId,
       payoutId: payout.id,
       wallet,
@@ -233,12 +235,36 @@ export async function executePayout(
     if (mockSignature) {
       txHash = mockSignature;
     } else {
-      const { treasuryWallet } = await import("../solana/wallet");
-      txHash = await transferUSDC({
-        fromWallet: treasuryWallet,
-        toWallet: wallet,
-        amount,
+      const { depositEscrow, initializeEscrow, releaseEscrow } = await import("../solana/escrow");
+      const initialized = await initializeEscrow({ invoiceId });
+      escrowPda = initialized.escrowPda;
+      await db.payout.update({
+        where: { id: payout.id },
+        data: { escrowPda },
       });
+
+      const deposited = await depositEscrow({ invoiceId, amount });
+      const released = await releaseEscrow({
+        invoiceId,
+        contractorWallet: wallet,
+      });
+
+      escrowPda = released.escrowPda;
+      await db.payout.update({
+        where: { id: payout.id },
+        data: { escrowPda },
+      });
+
+      console.info("[payout:service] Escrow lifecycle completed", {
+        invoiceId,
+        payoutId: payout.id,
+        escrowPda,
+        initializeSignature: initialized.signature ?? null,
+        depositSignature: deposited.signature ?? null,
+        releaseSignature: released.signature,
+      });
+
+      txHash = released.signature;
     }
   } catch (error) {
     await prisma.payout.update({
@@ -258,6 +284,7 @@ export async function executePayout(
           invoiceId,
           wallet,
           amount,
+          escrowPda,
           error: message,
         },
       }).catch(() => undefined);
@@ -268,6 +295,7 @@ export async function executePayout(
       invoiceId,
       wallet,
       amount,
+      escrowPda,
       error: message,
     });
 
@@ -290,6 +318,7 @@ export async function executePayout(
         data: {
           status: "CONFIRMED",
           txSignature: txHash,
+          escrowPda,
           executedAt: paidAt,
         },
       }),
@@ -315,6 +344,7 @@ export async function executePayout(
           payoutId: payout.id,
           invoiceId,
           txHash,
+          escrowPda,
         },
       }).catch(() => undefined);
     }
