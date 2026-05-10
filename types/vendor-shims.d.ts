@@ -89,10 +89,16 @@ declare module "@solana/web3.js" {
 
   export class Connection {
     constructor(endpoint: string, config?: unknown);
-    getAccountInfo(publicKey: PublicKey): Promise<{ owner: PublicKey; executable?: boolean } | null>;
+    getAccountInfo(
+      publicKey: PublicKey,
+      commitment?: Commitment,
+    ): Promise<{ owner: PublicKey; executable?: boolean; data: Buffer } | null>;
+    getParsedAccountInfo(publicKey: PublicKey, commitment?: Commitment): Promise<any>;
+    getBalance(publicKey: PublicKey, commitment?: Commitment): Promise<number>;
     getParsedTokenAccountsByOwner(owner: PublicKey, filter: unknown): Promise<any>;
-    getTokenAccountBalance(publicKey: PublicKey): Promise<{ value: { amount: string } }>;
+    getTokenAccountBalance(publicKey: PublicKey): Promise<{ value: { amount: string; uiAmount?: number | null } }>;
     getLatestBlockhash(commitment?: Commitment): Promise<any>;
+    getTransaction(signature: string, config?: unknown): Promise<any>;
     confirmTransaction(strategy: unknown, commitment?: Commitment): Promise<any>;
     sendTransaction(transaction: Transaction, signers: Keypair[], options?: unknown): Promise<string>;
     sendRawTransaction(rawTransaction: Buffer | Uint8Array, options?: unknown): Promise<string>;
@@ -105,4 +111,46 @@ declare module "@solana/web3.js" {
   export const SYSVAR_RENT_PUBKEY: PublicKey;
 
   export function clusterApiUrl(network: string): string;
+}
+
+declare module "@solana/wallet-adapter-react" {
+  import type * as React from "react";
+
+  export type WalletContextState = {
+    publicKey: { toBase58(): string } | null;
+    connected: boolean;
+    connecting: boolean;
+    disconnecting: boolean;
+    wallet: { adapter: { name: string } } | null;
+    disconnect: () => Promise<void>;
+    connect: () => Promise<void>;
+  };
+
+  export function useWallet(): WalletContextState;
+
+  export const ConnectionProvider: React.ComponentType<
+    React.PropsWithChildren<{
+      endpoint: string;
+    }>
+  >;
+
+  export const WalletProvider: React.ComponentType<
+    React.PropsWithChildren<{
+      wallets: unknown[];
+      autoConnect?: boolean;
+    }>
+  >;
+}
+
+declare module "@solana/wallet-adapter-react-ui" {
+  import type * as React from "react";
+
+  export const WalletModalProvider: React.ComponentType<React.PropsWithChildren>;
+  export const WalletMultiButton: React.ComponentType<Record<string, unknown>>;
+}
+
+declare module "@solana/wallet-adapter-phantom" {
+  export class PhantomWalletAdapter {
+    constructor();
+  }
 }
