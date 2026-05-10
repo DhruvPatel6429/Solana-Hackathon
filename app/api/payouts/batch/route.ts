@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { toHttpErrorResponse } from "@/lib/auth/http";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
+import { assertCsrfSafe, assertIdempotencyKey, assertRateLimit, ApiProtectionError } from "@/lib/security/api-protection";
+import { assertRecipientAllowed } from "@/lib/security/solana-guards";
 import { executeBatchPayout } from "@/lib/solana/transfer";
+import { getRequestId, jsonWithRequestId, logger } from "@/lib/utils/logger";
+import { recordReconciliationAudit } from "@/lib/services/reconciliation.service";
 
 const db = prisma as any;
 
@@ -32,11 +36,18 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const requestId = getRequestId(request);
   let tenant: Awaited<ReturnType<typeof requireAdmin>>;
 
   try {
+    assertRateLimit(request, { scope: "payout-batch", limit: 10, windowMs: 60_000 });
+    assertCsrfSafe(request);
+    assertIdempotencyKey(request, "payout-batch");
     tenant = await requireAdmin(request);
   } catch (error) {
+    if (error instanceof ApiProtectionError) {
+      return jsonWithRequestId({ success: false, error: error.message }, { status: error.status }, requestId);
+    }
     return toHttpErrorResponse(error);
   }
 
@@ -85,6 +96,14 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  try {
+    for (const invoice of invoices) {
+      assertRecipientAllowed(invoice.contractor.walletAddress);
+    }
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "Invalid payout recipient.", 400);
+  }
+
   const existingPayout = await db.payout.findFirst({
     where: {
       invoiceId: { in: invoiceIds },
@@ -128,7 +147,8 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  console.info("[api:payouts:batch] Executing batch payout", {
+  logger.info("Batch payout execution started", {
+    requestId,
     companyId: tenant.companyId,
     invoiceIds,
     payoutIds: payoutRows.map((payout) => payout.id),
@@ -165,18 +185,19 @@ export async function POST(request: Request): Promise<Response> {
       ),
     ]);
 
-    console.info("[api:payouts:batch] Batch payout finalized", {
+    logger.info("Batch payout finalized", {
+      requestId,
       companyId: tenant.companyId,
       invoiceIds,
-      signature: result.signature,
+      txSignature: result.signature,
     });
 
-    return NextResponse.json({
+    return jsonWithRequestId({
       success: true,
       txHash: result.signature,
       txSignature: result.signature,
       payoutIds: payoutRows.map((payout) => payout.id),
-    });
+    }, {}, requestId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -189,7 +210,24 @@ export async function POST(request: Request): Promise<Response> {
       ),
     ).catch(() => undefined);
 
-    console.error("[api:payouts:batch] Batch payout failed", {
+    await Promise.all(
+      payoutRows.map((payout) =>
+        recordReconciliationAudit({
+          companyId: tenant.companyId,
+          scope: "BATCH_PAYOUT_FAILURE",
+          entityType: "Payout",
+          entityId: payout.id,
+          severity: "CRITICAL",
+          expectedValue: payout.amountUsdc,
+          actualValue: 0,
+          metadata: { invoiceId: payout.invoiceId, error: message },
+          correlationId: requestId,
+        }),
+      ),
+    ).catch(() => undefined);
+
+    logger.error("Batch payout failed", {
+      requestId,
       companyId: tenant.companyId,
       invoiceIds,
       error: message,

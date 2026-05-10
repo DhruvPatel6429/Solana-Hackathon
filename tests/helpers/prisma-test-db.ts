@@ -14,6 +14,9 @@ type TestDb = {
   webhookEvent: TestTable;
   billingEvent: TestTable;
   treasuryTransaction: TestTable;
+  failedJob: TestTable;
+  deadLetterWebhook: TestTable;
+  reconciliationAudit: TestTable;
 };
 
 function now(): Date {
@@ -35,6 +38,9 @@ function createDb(): TestDb {
     webhookEvent: { rows: [] },
     billingEvent: { rows: [] },
     treasuryTransaction: { rows: [] },
+    failedJob: { rows: [] },
+    deadLetterWebhook: { rows: [] },
+    reconciliationAudit: { rows: [] },
   };
 }
 
@@ -42,6 +48,24 @@ function matchesWhere(row: Row, where: Row = {}): boolean {
   return Object.entries(where).every(([key, expected]) => {
     if (key === "OR" && Array.isArray(expected)) {
       return expected.some((candidate) => matchesWhere(row, candidate));
+    }
+
+    if (
+      expected &&
+      typeof expected === "object" &&
+      !Array.isArray(expected) &&
+      "lte" in expected
+    ) {
+      return row[key] <= expected.lte;
+    }
+
+    if (
+      expected &&
+      typeof expected === "object" &&
+      !Array.isArray(expected) &&
+      "gte" in expected
+    ) {
+      return row[key] >= expected.gte;
     }
 
     if (
@@ -190,6 +214,13 @@ export async function installPrismaTestDb(): Promise<{
     return row ? { ...row } : null;
   });
 
+  replace(prisma.company, "findMany", async ({ where, select, take }: any = {}) => {
+    const rows = db.company.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.company.rows.length);
+    return rows.map((row) => applySelect(row, select));
+  });
+
   replace(prisma.company, "update", async ({ where, data }: any) => {
     const row = db.company.rows.find((candidate) =>
       matchesWhere(candidate, where),
@@ -285,6 +316,15 @@ export async function installPrismaTestDb(): Promise<{
       : withInvoiceIncludes(db, row, include);
   });
 
+  replace(prisma.invoice, "findMany", async ({ where, include, select, take }: any = {}) => {
+    const rows = db.invoice.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.invoice.rows.length);
+    return rows.map((row) =>
+      select ? applySelect(row, select) : withInvoiceIncludes(db, row, include),
+    );
+  });
+
   replace(prisma.invoice, "update", async ({ where, data, include }: any) => {
     const row = db.invoice.rows.find((candidate) =>
       matchesWhere(candidate, where),
@@ -350,6 +390,11 @@ export async function installPrismaTestDb(): Promise<{
     return { ...row };
   });
 
+  replace(prisma.payout, "findFirst", async ({ where, select }: any = {}) => {
+    const row = db.payout.rows.find((candidate) => matchesWhere(candidate, where));
+    return row ? applySelect(row, select) : null;
+  });
+
   replace(prisma.auditLog, "create", async ({ data }: any) => {
     const row = {
       id: data.id ?? id("audit"),
@@ -406,6 +451,13 @@ export async function installPrismaTestDb(): Promise<{
     return { ...row };
   });
 
+  replace(prisma.webhookEvent, "findMany", async ({ where, take }: any = {}) => {
+    return db.webhookEvent.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.webhookEvent.rows.length)
+      .map((row) => ({ ...row }));
+  });
+
   replace(prisma.billingEvent, "upsert", async ({ where, create, update }: any) => {
     const row = db.billingEvent.rows.find(
       (candidate) => candidate.dodoPaymentId === where.dodoPaymentId,
@@ -443,6 +495,105 @@ export async function installPrismaTestDb(): Promise<{
     };
     db.treasuryTransaction.rows.push(created);
     return { ...created };
+  });
+
+  replace(prisma.treasuryTransaction, "findMany", async ({ where, take }: any = {}) => {
+    return db.treasuryTransaction.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.treasuryTransaction.rows.length)
+      .map((row) => ({ ...row }));
+  });
+
+  replace(prisma.failedJob, "upsert", async ({ where, create, update }: any) => {
+    const row = db.failedJob.rows.find((candidate) => matchesWhere(candidate, where));
+    if (row) {
+      Object.assign(row, update, { updatedAt: now() });
+      return { ...row };
+    }
+    const created = {
+      id: create.id ?? id("failed_job"),
+      ...create,
+      createdAt: create.createdAt ?? now(),
+      updatedAt: create.updatedAt ?? now(),
+    };
+    db.failedJob.rows.push(created);
+    return { ...created };
+  });
+
+  replace(prisma.failedJob, "findMany", async ({ where, take }: any = {}) => {
+    return db.failedJob.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.failedJob.rows.length)
+      .map((row) => ({ ...row }));
+  });
+
+  replace(prisma.failedJob, "count", async ({ where }: any = {}) => {
+    return db.failedJob.rows.filter((candidate) => matchesWhere(candidate, where)).length;
+  });
+
+  replace(prisma.failedJob, "update", async ({ where, data }: any) => {
+    const row = db.failedJob.rows.find((candidate) => matchesWhere(candidate, where));
+    if (!row) throw new Error("Failed job not found");
+    Object.assign(row, data, { updatedAt: now() });
+    return { ...row };
+  });
+
+  replace(prisma.deadLetterWebhook, "upsert", async ({ where, create, update }: any) => {
+    const provider = where.provider_externalId?.provider ?? where.provider;
+    const externalId = where.provider_externalId?.externalId ?? where.externalId;
+    const row = db.deadLetterWebhook.rows.find(
+      (candidate) => candidate.provider === provider && candidate.externalId === externalId,
+    );
+    if (row) {
+      Object.assign(row, update);
+      return { ...row };
+    }
+    const created = {
+      id: create.id ?? id("dead_webhook"),
+      ...create,
+      receivedAt: create.receivedAt ?? now(),
+    };
+    db.deadLetterWebhook.rows.push(created);
+    return { ...created };
+  });
+
+  replace(prisma.deadLetterWebhook, "findMany", async ({ where, take }: any = {}) => {
+    return db.deadLetterWebhook.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.deadLetterWebhook.rows.length)
+      .map((row) => ({ ...row }));
+  });
+
+  replace(prisma.deadLetterWebhook, "count", async ({ where }: any = {}) => {
+    return db.deadLetterWebhook.rows.filter((candidate) => matchesWhere(candidate, where)).length;
+  });
+
+  replace(prisma.deadLetterWebhook, "update", async ({ where, data }: any) => {
+    const row = db.deadLetterWebhook.rows.find((candidate) => matchesWhere(candidate, where));
+    if (!row) throw new Error("Dead letter webhook not found");
+    Object.assign(row, data);
+    return { ...row };
+  });
+
+  replace(prisma.reconciliationAudit, "create", async ({ data }: any) => {
+    const row = {
+      id: data.id ?? id("reconciliation"),
+      ...data,
+      createdAt: data.createdAt ?? now(),
+    };
+    db.reconciliationAudit.rows.push(row);
+    return { ...row };
+  });
+
+  replace(prisma.reconciliationAudit, "findMany", async ({ where, take }: any = {}) => {
+    return db.reconciliationAudit.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .slice(0, take ?? db.reconciliationAudit.rows.length)
+      .map((row) => ({ ...row }));
+  });
+
+  replace(prisma.reconciliationAudit, "count", async ({ where }: any = {}) => {
+    return db.reconciliationAudit.rows.filter((candidate) => matchesWhere(candidate, where)).length;
   });
 
   return {

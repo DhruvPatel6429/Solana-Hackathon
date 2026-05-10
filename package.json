@@ -15,7 +15,14 @@
     "anchor:build": "anchor build",
     "anchor:deploy": "anchor deploy --provider.cluster devnet",
     "sync-idl": "tsx scripts/sync-idl.ts",
-    "verify-program": "tsx scripts/verify-program.ts"
+    "verify-program": "tsx scripts/verify-program.ts",
+    "test:e2e:devnet": "tsx scripts/run-devnet-e2e.ts",
+    "deploy:staging": "tsx scripts/deploy.ts staging",
+    "deploy:prod": "tsx scripts/deploy.ts production",
+    "db:migrate:prod": "tsx scripts/db-migrate-prod.ts",
+    "verify:prod": "tsx scripts/verify-prod.ts",
+    "db:audit": "tsx scripts/db-audit.ts",
+    "db:seed:prod": "tsx scripts/seed-db.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

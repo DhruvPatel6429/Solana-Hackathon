@@ -10,6 +10,7 @@ type AuditQuery = {
   from?: string;
   to?: string;
   kycStatus?: "Verified" | "Pending" | "Rejected" | "All";
+  type?: "payouts" | "treasury" | "invoices" | "webhooks" | "reconciliation";
 };
 
 type ApiErrorPayload = {
@@ -86,6 +87,7 @@ function buildAuditQuery(params?: AuditQuery): string {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   if (params.kycStatus && params.kycStatus !== "All") query.set("kycStatus", params.kycStatus);
+  if (params.type) query.set("type", params.type);
 
   const value = query.toString();
   return value ? `?${value}` : "";
@@ -268,4 +270,9 @@ export const api = {
   },
   reportUsage: (eventType: "invoice" | "payout" | "fx_quote" = "payout", referenceId?: string) =>
     fetchJson<void>("/api/billing/report-usage", { method: "POST", body: JSON.stringify({ eventType, referenceId }) }),
+  systemHealth: () => fetchJson<any>("/api/admin/system-health"),
+  systemMetrics: () => fetchJson<any>("/api/admin/metrics"),
+  reconciliationReport: () => fetchJson<any>("/api/admin/reconciliation-report"),
+  recoverPayouts: () => fetchJson<any>("/api/admin/recovery/payouts", { method: "POST", body: JSON.stringify({}) }),
+  replayWebhooks: () => fetchJson<any>("/api/admin/recovery/webhooks", { method: "POST", body: JSON.stringify({}) }),
 };

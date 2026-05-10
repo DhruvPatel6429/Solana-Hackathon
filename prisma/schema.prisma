@@ -207,3 +207,73 @@ model TreasuryTransaction {
   @@index([direction])
   @@index([createdAt])
 }
+
+model FailedJob {
+  id             String    @id @default(cuid())
+  jobType        String
+  entityType     String?
+  entityId       String?
+  status         String    @default("PENDING_RETRY")
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  nextRetryAt    DateTime?
+  lastError      String?
+  metadata       Json?
+  correlationId  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  resolvedAt     DateTime?
+
+  @@index([jobType])
+  @@index([status])
+  @@index([nextRetryAt])
+  @@index([entityType, entityId])
+}
+
+model DeadLetterWebhook {
+  id             String    @id @default(cuid())
+  provider       String
+  externalId     String?
+  eventType      String?
+  signature      String?
+  nonce          String?
+  status         String    @default("PENDING_REPLAY")
+  attempts       Int       @default(0)
+  nextRetryAt    DateTime?
+  lastError      String?
+  payload        Json
+  correlationId  String?
+  receivedAt     DateTime  @default(now())
+  processedAt    DateTime?
+
+  @@unique([provider, externalId])
+  @@index([provider])
+  @@index([status])
+  @@index([nextRetryAt])
+  @@index([receivedAt])
+}
+
+model ReconciliationAudit {
+  id             String   @id @default(cuid())
+  companyId      String?
+  scope          String
+  entityType     String?
+  entityId       String?
+  severity       String   @default("INFO")
+  status         String   @default("OPEN")
+  expectedValue  Decimal?
+  actualValue    Decimal?
+  deltaValue     Decimal?
+  txSignature    String?
+  metadata       Json?
+  correlationId  String?
+  createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+
+  @@index([companyId])
+  @@index([scope])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}

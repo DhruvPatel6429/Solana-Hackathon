@@ -1,6 +1,8 @@
 import { toHttpErrorResponse } from "@/lib/auth/http";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
+import { assertCsrfSafe, assertIdempotencyKey, assertRateLimit, ApiProtectionError } from "@/lib/security/api-protection";
+import { getRequestId, jsonWithRequestId, logger } from "@/lib/utils/logger";
 
 type ExecutePayoutRequestBody = {
   invoiceId?: unknown;
@@ -65,11 +67,18 @@ function getStatusCode(error: unknown): number {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const requestId = getRequestId(request);
   let tenant: Awaited<ReturnType<typeof requireAdmin>>;
 
   try {
+    assertRateLimit(request, { scope: "payout-execute", limit: 20, windowMs: 60_000 });
+    assertCsrfSafe(request);
+    assertIdempotencyKey(request, "payout-execute");
     tenant = await requireAdmin(request);
   } catch (error) {
+    if (error instanceof ApiProtectionError) {
+      return jsonWithRequestId({ success: false, error: error.message }, { status: error.status }, requestId);
+    }
     return toHttpErrorResponse(error);
   }
 
@@ -85,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
     const { executePayout } = await import("../../../../lib/services/payout.service");
     const invoiceId = typeof body.invoiceId === "string" ? body.invoiceId.trim() : "";
     if (!invoiceId) {
-      return errorResponse("invoiceId is required.", 400);
+      return jsonWithRequestId({ success: false, error: "invoiceId is required." }, { status: 400 }, requestId);
     }
 
     const invoice = await db.invoice.findFirst({
@@ -99,12 +108,12 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!invoice) {
-      return errorResponse(`Invoice ${invoiceId} not found.`, 404);
+      return jsonWithRequestId({ success: false, error: `Invoice ${invoiceId} not found.` }, { status: 404 }, requestId);
     }
 
     const wallet = invoice.contractor?.walletAddress;
     if (!wallet) {
-      return errorResponse("Contractor wallet address is missing.", 400);
+      return jsonWithRequestId({ success: false, error: "Contractor wallet address is missing." }, { status: 400 }, requestId);
     }
 
     const result = await executePayout({
@@ -114,7 +123,15 @@ export async function POST(request: Request): Promise<Response> {
       companyId: tenant.companyId,
     });
 
-    return Response.json({
+    logger.info("Payout execution API succeeded", {
+      requestId,
+      companyId: tenant.companyId,
+      invoiceId,
+      payoutId: result.payoutId,
+      txSignature: result.txHash,
+    });
+
+    return jsonWithRequestId({
       success: true,
       txHash: result.txHash,
       txSignature: result.txHash,
@@ -124,16 +141,18 @@ export async function POST(request: Request): Promise<Response> {
         txSignature: result.txHash,
         solanaTxSignature: result.txHash,
       },
-    });
+    }, {}, requestId);
   } catch (error) {
     const message = getErrorMessage(error);
     const status = getStatusCode(error);
 
-    console.error("[api:payouts:execute] Request failed", {
+    logger.error("Payout execution API failed", {
+      requestId,
+      companyId: tenant.companyId,
       status,
       error: message,
     });
 
-    return errorResponse(message, status);
+    return jsonWithRequestId({ success: false, error: message }, { status }, requestId);
   }
 }
