@@ -22,7 +22,17 @@
     "db:migrate:prod": "tsx scripts/db-migrate-prod.ts",
     "verify:prod": "tsx scripts/verify-prod.ts",
     "db:audit": "tsx scripts/db-audit.ts",
-    "db:seed:prod": "tsx scripts/seed-db.ts"
+    "db:seed:prod": "tsx scripts/seed-db.ts",
+    "phase4:setup-devnet": "tsx scripts/setup-devnet.ts",
+    "phase4:validate-anchor": "tsx scripts/validate-anchor-deployment.ts",
+    "phase4:live-payroll": "tsx scripts/run-live-payroll-flow.ts",
+    "phase4:batch": "tsx scripts/run-batch-validation.ts",
+    "phase4:split": "tsx scripts/run-split-validation.ts",
+    "phase4:dodo": "tsx scripts/test-dodo-webhook.ts",
+    "phase4:helius": "tsx scripts/test-helius-webhook.ts",
+    "phase4:recovery": "tsx scripts/test-recovery-scenarios.ts",
+    "phase4:certify": "tsx scripts/run-production-certification.ts",
+    "phase4:report": "tsx scripts/generate-final-validation-report.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
