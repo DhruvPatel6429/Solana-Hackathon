@@ -4,6 +4,9 @@ import { PublicKey, Keypair } from "@solana/web3.js";
 import { connection } from "@/lib/solana/connection";
 import { USDC_DECIMALS, DEVNET_USDC_MINT } from "@/lib/solana/tokens";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * GET /api/treasury/balance
  *

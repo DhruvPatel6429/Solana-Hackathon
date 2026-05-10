@@ -18,7 +18,7 @@ import { Select } from "@/components/ui/select";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { useContractors, useExecutePayouts, useFxRates, useInvoiceActions, useInvoices, useTreasuryBalance } from "@/hooks/use-app-data";
-import { invoices as mockInvoices, treasury } from "@/lib/mock-data";
+import { treasury } from "@/lib/mock-data";
 import { formatUSDC, truncateHash } from "@/lib/utils";
 
 const statusTone = {
@@ -47,8 +47,8 @@ const integrationStack = [
 
 export default function DashboardPage() {
   const { data: treasuryData, isLoading: treasuryLoading } = useTreasuryBalance();
-  const { data: contractors = [], isLoading: contractorsLoading } = useContractors();
-  const { data: invoiceData = mockInvoices, isLoading: invoicesLoading } = useInvoices();
+  const { data: contractors = [], isLoading: contractorsLoading, error: contractorsError } = useContractors();
+  const { data: invoiceData = [], isLoading: invoicesLoading, error: invoicesError } = useInvoices();
   const { data: fxRates = [] } = useFxRates();
   const { approve, reject } = useInvoiceActions();
   const executePayouts = useExecutePayouts();
@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const filteredContractors = contractors.filter((contractor) => {
     const matchesSearch = contractor.name.toLowerCase().includes(search.toLowerCase());
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   const shownInvoices = invoiceData.filter((invoice) => invoice.status === invoiceTab);
   const payoutQueue = invoiceData.filter((invoice) => invoice.status === "Approved");
   const monthSpend = invoiceData.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + invoice.amount, 0);
+  const payoutInvoiceIds = payoutQueue.map((invoice) => invoice.id);
 
   const stats = useMemo(
     () => [
@@ -81,7 +83,9 @@ export default function DashboardPage() {
     ],
     [contractors, contractorsLoading, invoiceData, invoicesLoading, monthSpend, treasuryData?.balance, treasuryLoading],
   );
-  const approvalRate = Math.round((invoiceData.filter((invoice) => invoice.status === "Approved" || invoice.status === "Paid").length / invoiceData.length) * 100);
+  const approvalRate = invoiceData.length
+    ? Math.round((invoiceData.filter((invoice) => invoice.status === "Approved" || invoice.status === "Paid").length / invoiceData.length) * 100)
+    : 0;
 
   return (
     <AppShell>
@@ -140,7 +144,7 @@ export default function DashboardPage() {
                       The dashboard ties the product story together: Dodo subscription, USDC treasury, invoice approval, Solana proof, and compliance export.
                     </p>
                   </div>
-                  <Button onClick={() => executePayouts.mutate()} disabled={executePayouts.isPending}>
+                  <Button onClick={() => executePayouts.mutate(payoutInvoiceIds)} disabled={executePayouts.isPending || payoutInvoiceIds.length === 0}>
                     <Zap className="h-4 w-4" />
                     Run judge demo
                   </Button>
@@ -165,6 +169,13 @@ export default function DashboardPage() {
         </FadeIn>
 
         <JudgeDemoPanel />
+
+        {(contractorsError || invoicesError) && (
+          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+            {contractorsError && <p>Contractors failed to load: {contractorsError instanceof Error ? contractorsError.message : "Unknown error"}</p>}
+            {invoicesError && <p>Invoices failed to load: {invoicesError instanceof Error ? invoicesError.message : "Unknown error"}</p>}
+          </div>
+        )}
 
         <div className="grid gap-4 lg:grid-cols-4">
           {stats.map((stat, index) => {
@@ -326,7 +337,7 @@ export default function DashboardPage() {
           </Card>
 
           <Card id="payouts">
-            <CardHeader><CardTitle>Payout Queue</CardTitle><Button onClick={() => executePayouts.mutate()} disabled={executePayouts.isPending}><Zap className="h-4 w-4" />Execute Batch Payout</Button></CardHeader>
+            <CardHeader><CardTitle>Payout Queue</CardTitle><Button onClick={() => executePayouts.mutate(payoutInvoiceIds)} disabled={executePayouts.isPending || payoutInvoiceIds.length === 0}><Zap className="h-4 w-4" />Execute Batch Payout</Button></CardHeader>
             <p className="mb-4 text-sm text-zinc-400">Estimated gas fee: 0.00021 SOL - {payoutQueue.length} recipients</p>
             <div className="space-y-3">
               {payoutQueue.map((invoice) => (
@@ -364,8 +375,28 @@ export default function DashboardPage() {
       <Dialog open={inviteOpen} title="Invite Contractor" onOpenChange={setInviteOpen}>
         <div className="space-y-3"><Input placeholder="Contractor email" /><Select><option>USDC wallet payout</option><option>Local currency payout</option></Select><Button className="w-full">Send invite</Button></div>
       </Dialog>
-      <Dialog open={Boolean(rejectId)} title="Reject Invoice" onOpenChange={() => setRejectId(null)}>
-        <div className="space-y-4"><Textarea placeholder="Reason for rejection" /><Button variant="danger" onClick={() => rejectId && reject.mutate({ id: rejectId, reason: "Needs corrected line items" })}>Reject invoice</Button></div>
+      <Dialog open={Boolean(rejectId)} title="Reject Invoice" onOpenChange={(open) => { if (!open) { setRejectId(null); setRejectReason(""); } }}>
+        <div className="space-y-4">
+          <Textarea placeholder="Reason for rejection" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
+          <Button
+            variant="danger"
+            disabled={!rejectId || !rejectReason.trim() || reject.isPending}
+            onClick={() => {
+              if (!rejectId) return;
+              reject.mutate(
+                { id: rejectId, reason: rejectReason.trim() },
+                {
+                  onSuccess: () => {
+                    setRejectId(null);
+                    setRejectReason("");
+                  },
+                },
+              );
+            }}
+          >
+            Reject invoice
+          </Button>
+        </div>
       </Dialog>
     </AppShell>
   );

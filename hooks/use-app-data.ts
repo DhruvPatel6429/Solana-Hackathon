@@ -27,9 +27,17 @@ export function useInvoiceActions() {
   const approve = useMutation({
     mutationFn: api.approveInvoice,
     onSuccess: () => {
-      pushToast({ type: "success", message: "Invoice approved and escrow release queued." });
+      pushToast({ type: "success", message: "Invoice approved and escrow released." });
       api.reportUsage("invoice", "invoice-approval").catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["treasury"] });
+      queryClient.invalidateQueries({ queryKey: ["payouts"] });
+    },
+    onError: (error) => {
+      pushToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Invoice approval failed.",
+      });
     },
   });
 
@@ -39,6 +47,12 @@ export function useInvoiceActions() {
       pushToast({ type: "info", message: "Invoice rejected with reason saved." });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
+    onError: (error) => {
+      pushToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Invoice rejection failed.",
+      });
+    },
   });
 
   return { approve, reject };
@@ -46,11 +60,21 @@ export function useInvoiceActions() {
 
 export function useExecutePayouts() {
   const pushToast = useAppStore((state) => state.pushToast);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: api.executePayouts,
     onSuccess: (data) => {
       api.reportUsage("payout", data.txSignature).catch(() => undefined);
       pushToast({ type: "success", message: `Batch payout executed: ${data.txSignature.slice(0, 8)}...` });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["treasury"] });
+      queryClient.invalidateQueries({ queryKey: ["payouts"] });
+    },
+    onError: (error) => {
+      pushToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Batch payout failed.",
+      });
     },
   });
 }

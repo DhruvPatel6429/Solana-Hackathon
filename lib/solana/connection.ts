@@ -1,6 +1,6 @@
 import { clusterApiUrl, Commitment, Connection } from "@solana/web3.js";
 
-const DEFAULT_COMMITMENT: Commitment = "confirmed";
+const DEFAULT_COMMITMENT: Commitment = "finalized";
 
 export const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? "devnet";
 

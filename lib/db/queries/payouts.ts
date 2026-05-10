@@ -112,7 +112,7 @@ export async function listPayoutsByCompany(
       contractor:
         payout.contractor?.name ??
         `Wallet ${payout.contractorWallet.slice(0, 6)}...${payout.contractorWallet.slice(-4)}`,
-      amount: payout.amountUsdc,
+      amount: Number(payout.amountUsdc),
       currency: toCurrency(payout.currency),
       date: (payout.executedAt ?? payout.createdAt).toISOString().slice(0, 10),
       invoiceId: payout.invoiceId,

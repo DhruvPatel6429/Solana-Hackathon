@@ -46,7 +46,20 @@ function getStatusCode(error: unknown): number {
     return 404;
   }
 
-  if (name.includes("PayoutExecution") || name.includes("SolanaTransfer")) {
+  if (name.includes("EscrowNotFound")) {
+    return 404;
+  }
+
+  if (name.includes("EscrowAlreadyReleased") || name.includes("DuplicatePayout")) {
+    return 409;
+  }
+
+  if (
+    name.includes("PayoutExecution") ||
+    name.includes("SolanaTransfer") ||
+    name.includes("EscrowRelease") ||
+    name.includes("EscrowDeposit")
+  ) {
     return 500;
   }
 
@@ -86,7 +99,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const role = getClaimedRole(tenant.claims);
-  if (role && role !== "admin") {
+  if (role !== "admin") {
     return NextResponse.json(
       { success: false, error: "Only admins can execute payouts." },
       { status: 403 },
