@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "@solana/wallet-adapter-react-ui/styles.css";
 import "../styles/globals.css";
 import { AppProviders } from "@/components/providers";
 import { ToastViewport } from "@/components/toast-viewport";

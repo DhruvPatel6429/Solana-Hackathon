@@ -107,6 +107,7 @@ export async function processHeliusTreasuryWebhook(payload: unknown) {
       await db.treasuryTransaction.upsert({
         where: { signature: tx.signature },
         create: {
+          organizationId: company.organizationId ?? null,
           companyId: company.id,
           signature: tx.signature,
           walletAddress: company.treasuryWalletAddress,
@@ -117,6 +118,7 @@ export async function processHeliusTreasuryWebhook(payload: unknown) {
           slot: tx.slot ? BigInt(tx.slot) : undefined,
         },
         update: {
+          organizationId: company.organizationId ?? null,
           companyId: company.id,
           walletAddress: company.treasuryWalletAddress,
           amountUsdc: amountUsdc.toString(),

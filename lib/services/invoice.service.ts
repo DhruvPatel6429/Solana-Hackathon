@@ -87,9 +87,14 @@ export async function createInvoice(input: CreateInvoiceInput) {
   }
 
   const invoiceHash = computeInvoiceHash(input);
+  const company = await prisma.company.findUnique({
+    where: { id: input.companyId },
+    select: { organizationId: true },
+  });
 
   const invoice = await prisma.invoice.create({
     data: {
+      organizationId: company?.organizationId ?? null,
       contractorId: input.contractorId,
       companyId: input.companyId,
       amountUsdc: input.amountUsdc.toString(),
@@ -231,6 +236,7 @@ export async function approveInvoice(input: ApproveInvoiceInput) {
   // Write to audit log
   await prisma.auditLog.create({
     data: {
+      organizationId: invoice.organizationId ?? null,
       companyId: invoice.companyId,
       action: "INVOICE_APPROVED",
       actorUserId: adminId,
@@ -287,6 +293,7 @@ export async function rejectInvoice(input: RejectInvoiceInput) {
   // Write to audit log
   await prisma.auditLog.create({
     data: {
+      organizationId: invoice.organizationId ?? null,
       companyId: invoice.companyId,
       action: "INVOICE_REJECTED",
       actorUserId: adminId,

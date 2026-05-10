@@ -32,7 +32,14 @@
     "phase4:helius": "tsx scripts/test-helius-webhook.ts",
     "phase4:recovery": "tsx scripts/test-recovery-scenarios.ts",
     "phase4:certify": "tsx scripts/run-production-certification.ts",
-    "phase4:report": "tsx scripts/generate-final-validation-report.ts"
+    "phase4:report": "tsx scripts/generate-final-validation-report.ts",
+    "phase5:load-test": "tsx scripts/load-test-platform.ts",
+    "phase5:verify-tenancy": "tsx scripts/verify-tenant-isolation.ts",
+    "phase5:backup-db": "tsx scripts/backup-database.ts",
+    "phase5:dr-drill": "tsx scripts/run-disaster-recovery-drill.ts",
+    "phase5:demo-seed": "tsx scripts/run-enterprise-demo.ts",
+    "phase5:certify": "tsx scripts/run-enterprise-certification.ts",
+    "phase5:report": "tsx scripts/generate-final-enterprise-report.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

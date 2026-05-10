@@ -11,6 +11,14 @@ ALTER TABLE "UsageEvent" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BillingEvent" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TreasuryTransaction" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "WebhookEvent" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Organization" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "OrganizationMember" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ApiKey" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PartnerIntegration" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PartnerWebhookSubscription" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ComplianceAlert" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GovernancePolicy" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DisasterRecoverySnapshot" ENABLE ROW LEVEL SECURITY;
 
 -- Role assumptions:
 -- - Company admins carry app_metadata.role = 'admin' in Supabase Auth.
@@ -36,6 +44,18 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT COALESCE(auth.jwt() -> 'user_metadata' ->> 'contractorId', '')
+$$;
+
+CREATE OR REPLACE FUNCTION current_organization_ids()
+RETURNS TABLE (organization_id text)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT DISTINCT c."organizationId"
+  FROM "CompanyUser" cu
+  JOIN "Company" c ON c."id" = cu."companyId"
+  WHERE cu."userId" = auth.uid()::text
+    AND c."organizationId" IS NOT NULL
 $$;
 
 CREATE POLICY "company_user_select_own_membership"
@@ -151,5 +171,93 @@ USING (
     FROM "CompanyUser" cu
     WHERE cu."companyId" = "UsageEvent"."companyId"
       AND cu."userId" = auth.uid()::text
+  )
+);
+
+CREATE POLICY "organization_select_by_membership"
+ON "Organization"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "Organization"."id"
+  )
+);
+
+CREATE POLICY "organization_member_select_by_org_membership"
+ON "OrganizationMember"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "OrganizationMember"."organizationId"
+  )
+);
+
+CREATE POLICY "api_key_select_by_org_membership"
+ON "ApiKey"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "ApiKey"."organizationId"
+  )
+);
+
+CREATE POLICY "partner_integration_select_by_org_membership"
+ON "PartnerIntegration"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "PartnerIntegration"."organizationId"
+  )
+);
+
+CREATE POLICY "partner_webhook_subscription_select_by_org_membership"
+ON "PartnerWebhookSubscription"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "PartnerWebhookSubscription"."organizationId"
+  )
+);
+
+CREATE POLICY "compliance_alert_select_by_org_membership"
+ON "ComplianceAlert"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "ComplianceAlert"."organizationId"
+  )
+);
+
+CREATE POLICY "governance_policy_select_by_org_membership"
+ON "GovernancePolicy"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "GovernancePolicy"."organizationId"
+  )
+);
+
+CREATE POLICY "disaster_recovery_snapshot_select_by_org_membership"
+ON "DisasterRecoverySnapshot"
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM current_organization_ids() ids
+    WHERE ids.organization_id = "DisasterRecoverySnapshot"."organizationId"
   )
 );

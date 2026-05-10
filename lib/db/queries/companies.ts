@@ -50,10 +50,19 @@ export async function createOrGetCompanyForUser({
       return existingMembership.company;
     }
 
+    const organization = await tx.organization.create({
+      data: {
+        name: companyName?.trim() || `Organization ${userId.slice(0, 8)}`,
+        slug: `org-${userId.slice(0, 8)}-${Date.now()}`,
+      },
+      select: { id: true },
+    });
+
     const company = await tx.company.create({
       data: {
         name: companyName?.trim() || `Company ${userId.slice(0, 8)}`,
         planTier: planTier?.trim() || "Starter",
+        organizationId: organization.id,
       },
       select: {
         id: true,
@@ -65,8 +74,18 @@ export async function createOrGetCompanyForUser({
 
     await tx.companyUser.create({
       data: {
+        organizationId: organization.id,
         companyId: company.id,
         userId,
+        role: "admin",
+      },
+    });
+
+    await tx.organizationMember.create({
+      data: {
+        organizationId: organization.id,
+        userId,
+        role: "OWNER",
       },
     });
 

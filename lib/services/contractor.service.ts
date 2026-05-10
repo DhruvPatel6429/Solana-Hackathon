@@ -82,6 +82,10 @@ function validateOnboardInput(input: OnboardContractorInput) {
  */
 export async function onboardContractor(input: OnboardContractorInput) {
   validateOnboardInput(input);
+  const company = await prisma.company.findUnique({
+    where: { id: input.companyId },
+    select: { organizationId: true },
+  });
 
   // Prevent duplicates within the same company tenant
   const duplicate = await prisma.contractor.findFirst({
@@ -99,6 +103,7 @@ export async function onboardContractor(input: OnboardContractorInput) {
 
   const contractor = await prisma.contractor.create({
     data: {
+      organizationId: company?.organizationId ?? null,
       companyId: input.companyId,
       name: input.name.trim(),
       email: input.email.toLowerCase().trim(),
@@ -114,6 +119,7 @@ export async function onboardContractor(input: OnboardContractorInput) {
   // Audit trail
   await prisma.auditLog.create({
     data: {
+      organizationId: company?.organizationId ?? null,
       companyId: input.companyId,
       action: "CONTRACTOR_ONBOARDED",
       actorUserId: contractor.id,
