@@ -40,3 +40,11 @@ export function buildPayoutCsv(rows: PayoutListItem[]): string {
 
   return lines.join("\n");
 }
+
+export function buildGenericCsv(rows: Array<Record<string, unknown>>, columns: string[]): string {
+  const lines = [columns.join(",")];
+  for (const row of rows) {
+    lines.push(columns.map((column) => escapeCsv(row[column])).join(","));
+  }
+  return lines.join("\n");
+}

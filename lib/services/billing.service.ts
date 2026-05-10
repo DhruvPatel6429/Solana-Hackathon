@@ -93,10 +93,16 @@ function dodoPaymentId(event: DodoWebhookEvent): string {
 export async function handleDodoWebhook({
   payload,
   signature,
+  skipFreshnessCheck = false,
 }: {
   payload: string;
   signature: string | null;
+  skipFreshnessCheck?: boolean;
 }): Promise<BillingAccountUpdate> {
+  if (!skipFreshnessCheck && process.env.NODE_ENV === "production" && !signature) {
+    throw new Error("Dodo webhook signature is required.");
+  }
+
   if (!verifyDodoSignature(payload, signature)) {
     throw new Error("Invalid Dodo webhook signature.");
   }

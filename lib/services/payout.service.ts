@@ -4,6 +4,9 @@ import type { Payout } from "@prisma/client";
 import { prisma } from "../db/prisma";
 import { logPayoutConfirmed, logPayoutFailed } from "./audit.service";
 import { InvalidWalletAddressError } from "../solana/transfer";
+import { logger } from "@/lib/utils/logger";
+import { assertSolanaExecutionGuards } from "@/lib/security/solana-guards";
+import { recordReconciliationAudit } from "@/lib/services/reconciliation.service";
 
 const db = prisma as any;
 
@@ -223,6 +226,8 @@ export async function executePayout(
   let escrowPda: string | null = payout.escrowPda ?? null;
 
   try {
+    assertSolanaExecutionGuards(wallet);
+
     console.info("[payout:service] Executing escrow-backed payout", {
       invoiceId,
       payoutId: payout.id,
@@ -288,9 +293,25 @@ export async function executePayout(
           error: message,
         },
       }).catch(() => undefined);
+
+      await recordReconciliationAudit({
+        companyId: invoice.companyId,
+        scope: "PAYOUT_FAILURE",
+        entityType: "Payout",
+        entityId: payout.id,
+        severity: "CRITICAL",
+        expectedValue: amount,
+        actualValue: 0,
+        metadata: {
+          invoiceId,
+          wallet,
+          escrowPda,
+          error: message,
+        },
+      }).catch(() => undefined);
     }
 
-    console.error("[payout:service] Payout failed", {
+    logger.error("Payout failed", {
       payoutId: payout.id,
       invoiceId,
       wallet,
@@ -357,15 +378,24 @@ export async function executePayout(
   } catch (error) {
     const message = getErrorMessage(error);
 
-    console.error(
-      "[payout:service] Payout confirmed on-chain but DB update failed",
-      {
-        payoutId: payout.id,
-        invoiceId,
-        txHash,
-        error: message,
-      },
-    );
+    logger.error("Payout confirmed on-chain but DB update failed", {
+      payoutId: payout.id,
+      invoiceId,
+      txSignature: txHash,
+      error: message,
+    });
+
+    await recordReconciliationAudit({
+      companyId: invoice.companyId,
+      scope: "PAYOUT_DB_CONFIRMATION_FAILURE",
+      entityType: "Payout",
+      entityId: payout.id,
+      severity: "CRITICAL",
+      expectedValue: amount,
+      actualValue: amount,
+      txSignature: txHash,
+      metadata: { invoiceId, escrowPda, error: message },
+    }).catch(() => undefined);
 
     throw new PayoutExecutionError(
       `Payout transaction confirmed, but the database confirmation update failed. txHash=${txHash}. ${message}`,

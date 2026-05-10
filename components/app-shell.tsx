@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardCheck, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, WalletCards, Zap } from "lucide-react";
+import { Activity, BarChart3, ClipboardCheck, FileText, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, WalletCards, Zap } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const nav = [
   { href: "/dashboard#invoices", label: "Invoices", icon: FileText },
   { href: "/dashboard#payouts", label: "Payouts", icon: Zap },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/operations", label: "Operations", icon: Activity },
   { href: "/compliance", label: "Compliance", icon: ShieldCheck },
   { href: "/onboarding", label: "Settings", icon: Settings },
 ];
