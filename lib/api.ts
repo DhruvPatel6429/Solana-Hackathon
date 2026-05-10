@@ -217,7 +217,7 @@ function normalizeInvoice(row: ApiInvoice): Invoice {
 }
 
 export const api = {
-  treasuryBalance: () => fetchJson<{ balance: number; wallet?: string; source: "solana" | "error"; error?: string }>("/api/treasury/balance"),
+  treasuryBalance: () => fetchJson<{ balance: number; wallet?: string; source: "solana" | "cache" | "error"; error?: string }>("/api/treasury/balance"),
   contractors: async () => {
     const response = await fetchJson<ContractorsResponse>("/api/contractors");
     return response.contractors.map(normalizeContractor);

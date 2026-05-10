@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { toHttpErrorResponse } from "@/lib/auth/http";
-import { requireTenantContext } from "@/lib/auth/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
 import { executeBatchPayout } from "@/lib/solana/transfer";
 
@@ -10,29 +10,6 @@ const db = prisma as any;
 type BatchPayoutBody = {
   invoiceIds?: unknown;
 };
-
-function getClaimedRole(claims: Record<string, unknown>): string | undefined {
-  const appMetadata = claims.app_metadata;
-  const userMetadata = claims.user_metadata;
-
-  if (
-    typeof appMetadata === "object" &&
-    appMetadata !== null &&
-    "role" in appMetadata
-  ) {
-    return String(appMetadata.role);
-  }
-
-  if (
-    typeof userMetadata === "object" &&
-    userMetadata !== null &&
-    "role" in userMetadata
-  ) {
-    return String(userMetadata.role);
-  }
-
-  return undefined;
-}
 
 function jsonError(error: string, status: number, details?: string) {
   return NextResponse.json(
@@ -55,16 +32,12 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
+  let tenant: Awaited<ReturnType<typeof requireAdmin>>;
 
   try {
-    tenant = await requireTenantContext(request);
+    tenant = await requireAdmin(request);
   } catch (error) {
     return toHttpErrorResponse(error);
-  }
-
-  if (getClaimedRole(tenant.claims) !== "admin") {
-    return jsonError("Only admins can execute batch payouts.", 403);
   }
 
   let body: BatchPayoutBody;

@@ -23,31 +23,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
 import { toHttpErrorResponse } from "@/lib/auth/http";
-import { requireTenantContext } from "@/lib/auth/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { rejectInvoice } from "@/lib/services/invoice.service";
-
-function getClaimedRole(claims: Record<string, unknown>): string | undefined {
-  const appMetadata = claims.app_metadata;
-  const userMetadata = claims.user_metadata;
-
-  if (
-    typeof appMetadata === "object" &&
-    appMetadata !== null &&
-    "role" in appMetadata
-  ) {
-    return String(appMetadata.role);
-  }
-
-  if (
-    typeof userMetadata === "object" &&
-    userMetadata !== null &&
-    "role" in userMetadata
-  ) {
-    return String(userMetadata.role);
-  }
-
-  return undefined;
-}
 
 // ─── Email helper ─────────────────────────────────────────────────────────────
 
@@ -129,20 +106,12 @@ interface RouteContext {
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   // ── 1. Auth — admin only ──────────────────────────────────────────────────
-  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
+  let tenant: Awaited<ReturnType<typeof requireAdmin>>;
 
   try {
-    tenant = await requireTenantContext(req);
+    tenant = await requireAdmin(req);
   } catch (error) {
     return toHttpErrorResponse(error);
-  }
-
-  const role = getClaimedRole(tenant.claims);
-  if (role !== "admin") {
-    return NextResponse.json(
-      { error: "Only admins can reject invoices" },
-      { status: 403 },
-    );
   }
 
   const { id: invoiceId } = params;

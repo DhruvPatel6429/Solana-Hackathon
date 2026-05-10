@@ -11,13 +11,22 @@
     "test": "node --import ./tests/setup-env.mjs --import tsx --test --test-concurrency=1 tests/**/*.test.ts",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "anchor:build": "anchor build",
+    "anchor:deploy": "anchor deploy --provider.cluster devnet",
+    "sync-idl": "tsx scripts/sync-idl.ts",
+    "verify-program": "tsx scripts/verify-program.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@project-serum/anchor": "^0.26.0",
+    "@reduxjs/toolkit": "^2.11.2",
     "@solana/spl-token": "^0.4.14",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-phantom": "^0.9.29",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.105.4",
     "@tailwindcss/postcss": "^4.2.4",

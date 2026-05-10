@@ -11,6 +11,9 @@ type TestDb = {
   invoice: TestTable;
   payout: TestTable;
   auditLog: TestTable;
+  webhookEvent: TestTable;
+  billingEvent: TestTable;
+  treasuryTransaction: TestTable;
 };
 
 function now(): Date {
@@ -29,11 +32,18 @@ function createDb(): TestDb {
     invoice: { rows: [] },
     payout: { rows: [] },
     auditLog: { rows: [] },
+    webhookEvent: { rows: [] },
+    billingEvent: { rows: [] },
+    treasuryTransaction: { rows: [] },
   };
 }
 
 function matchesWhere(row: Row, where: Row = {}): boolean {
   return Object.entries(where).every(([key, expected]) => {
+    if (key === "OR" && Array.isArray(expected)) {
+      return expected.some((candidate) => matchesWhere(row, candidate));
+    }
+
     if (
       expected &&
       typeof expected === "object" &&
@@ -41,6 +51,16 @@ function matchesWhere(row: Row, where: Row = {}): boolean {
       "not" in expected
     ) {
       return row[key] !== expected.not;
+    }
+
+    if (
+      expected &&
+      typeof expected === "object" &&
+      !Array.isArray(expected) &&
+      "in" in expected &&
+      Array.isArray(expected.in)
+    ) {
+      return expected.in.includes(row[key]);
     }
 
     return row[key] === expected;
@@ -131,9 +151,13 @@ export async function installPrismaTestDb(): Promise<{
     });
   }
 
-  replace(prisma, "$transaction", async (operations: Promise<unknown>[]) =>
-    Promise.all(operations),
-  );
+  replace(prisma, "$transaction", async (operations: Promise<unknown>[] | ((tx: any) => unknown)) => {
+    if (typeof operations === "function") {
+      return operations(prisma);
+    }
+
+    return Promise.all(operations);
+  });
 
   replace(prisma.company, "create", async ({ data }: any) => {
     const row = {
@@ -143,10 +167,39 @@ export async function installPrismaTestDb(): Promise<{
       dodoCustomerId: data.dodoCustomerId ?? null,
       dodoSubscriptionId: data.dodoSubscriptionId ?? null,
       treasuryWalletAddress: data.treasuryWalletAddress ?? null,
+      treasuryBalanceUsdc: data.treasuryBalanceUsdc ?? "0",
+      treasuryBalanceUpdatedAt: data.treasuryBalanceUpdatedAt ?? null,
       createdAt: data.createdAt ?? now(),
       updatedAt: data.updatedAt ?? now(),
     };
     db.company.rows.push(row);
+    return { ...row };
+  });
+
+  replace(prisma.company, "findUnique", async ({ where, select }: any) => {
+    const row = db.company.rows.find((candidate) =>
+      matchesWhere(candidate, where),
+    );
+    return row ? applySelect(row, select) : null;
+  });
+
+  replace(prisma.company, "findFirst", async ({ where }: any = {}) => {
+    const row = db.company.rows.find((candidate) =>
+      matchesWhere(candidate, where),
+    );
+    return row ? { ...row } : null;
+  });
+
+  replace(prisma.company, "update", async ({ where, data }: any) => {
+    const row = db.company.rows.find((candidate) =>
+      matchesWhere(candidate, where),
+    );
+
+    if (!row) {
+      throw new Error("Company not found");
+    }
+
+    Object.assign(row, data, { updatedAt: now() });
     return { ...row };
   });
 
@@ -308,6 +361,88 @@ export async function installPrismaTestDb(): Promise<{
     };
     db.auditLog.rows.push(row);
     return { ...row };
+  });
+
+  replace(prisma.webhookEvent, "findUnique", async ({ where }: any) => {
+    const provider = where.provider_externalId?.provider ?? where.provider;
+    const externalId = where.provider_externalId?.externalId ?? where.externalId;
+    const row = db.webhookEvent.rows.find(
+      (candidate) => candidate.provider === provider && candidate.externalId === externalId,
+    );
+    return row ? { ...row } : null;
+  });
+
+  replace(prisma.webhookEvent, "upsert", async ({ where, create, update }: any) => {
+    const provider = where.provider_externalId.provider;
+    const externalId = where.provider_externalId.externalId;
+    const row = db.webhookEvent.rows.find(
+      (candidate) => candidate.provider === provider && candidate.externalId === externalId,
+    );
+
+    if (row) {
+      Object.assign(row, update);
+      return { ...row };
+    }
+
+    const created = {
+      id: create.id ?? id("webhook"),
+      ...create,
+      createdAt: create.createdAt ?? now(),
+    };
+    db.webhookEvent.rows.push(created);
+    return { ...created };
+  });
+
+  replace(prisma.webhookEvent, "update", async ({ where, data }: any) => {
+    const row = db.webhookEvent.rows.find((candidate) =>
+      matchesWhere(candidate, where),
+    );
+
+    if (!row) {
+      throw new Error("Webhook event not found");
+    }
+
+    Object.assign(row, data);
+    return { ...row };
+  });
+
+  replace(prisma.billingEvent, "upsert", async ({ where, create, update }: any) => {
+    const row = db.billingEvent.rows.find(
+      (candidate) => candidate.dodoPaymentId === where.dodoPaymentId,
+    );
+
+    if (row) {
+      Object.assign(row, update, { updatedAt: now() });
+      return { ...row };
+    }
+
+    const created = {
+      id: create.id ?? id("billing"),
+      ...create,
+      createdAt: create.createdAt ?? now(),
+      updatedAt: create.updatedAt ?? now(),
+    };
+    db.billingEvent.rows.push(created);
+    return { ...created };
+  });
+
+  replace(prisma.treasuryTransaction, "upsert", async ({ where, create, update }: any) => {
+    const row = db.treasuryTransaction.rows.find(
+      (candidate) => candidate.signature === where.signature,
+    );
+
+    if (row) {
+      Object.assign(row, update);
+      return { ...row };
+    }
+
+    const created = {
+      id: create.id ?? id("treasury_tx"),
+      ...create,
+      createdAt: create.createdAt ?? now(),
+    };
+    db.treasuryTransaction.rows.push(created);
+    return { ...created };
   });
 
   return {

@@ -1,12 +1,21 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 import { createCheckoutSession, handleDodoWebhook, reportUsageUnit } from "../../lib/services/billing.service";
 import { signDodoPayload } from "../../lib/integrations/dodo/webhook";
+import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+let restoreDb: (() => void) | undefined;
+
+beforeEach(async () => {
+  const installed = await installPrismaTestDb();
+  restoreDb = installed.restore;
+});
 
 afterEach(() => {
+  restoreDb?.();
+  restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
 });
@@ -39,7 +48,7 @@ describe("Dodo billing service", () => {
     assert.equal(usage.usageEventId.includes("tx_demo_001"), true);
   });
 
-  test("rejects Dodo webhooks with an invalid signature", () => {
+  test("rejects Dodo webhooks with an invalid signature", async () => {
     process.env.DODO_WEBHOOK_SECRET = "secret_test";
     const payload = JSON.stringify({
       id: "evt_bad",
@@ -47,10 +56,10 @@ describe("Dodo billing service", () => {
       data: { companyId: "company_demo_01", status: "active" },
     });
 
-    assert.throws(() => handleDodoWebhook({ payload, signature: "00" }), /Invalid Dodo webhook signature/);
+    await assert.rejects(() => handleDodoWebhook({ payload, signature: "00" }), /Invalid Dodo webhook signature/);
   });
 
-  test("accepts signed Dodo webhooks and maps them to account updates", () => {
+  test("accepts signed Dodo webhooks and maps them to account updates", async () => {
     process.env.DODO_WEBHOOK_SECRET = "secret_test";
     const payload = JSON.stringify({
       id: "evt_good",
@@ -65,15 +74,16 @@ describe("Dodo billing service", () => {
     });
     const signature = signDodoPayload(payload, "secret_test");
 
-    const update = handleDodoWebhook({ payload, signature });
+    const update = await handleDodoWebhook({ payload, signature });
 
     assert.deepEqual(update, {
       eventId: "evt_good",
       companyId: "company_demo_01",
       customerId: "cus_123",
       subscriptionId: "sub_123",
-      status: "active",
+      status: "pending",
       plan: "growth",
+      processed: true,
     });
   });
 });

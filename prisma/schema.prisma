@@ -31,6 +31,8 @@ model Company {
   dodoCustomerId       String?
   dodoSubscriptionId   String?
   treasuryWalletAddress String?
+  treasuryBalanceUsdc  Decimal      @default(0)
+  treasuryBalanceUpdatedAt DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   users                CompanyUser[]
@@ -39,6 +41,8 @@ model Company {
   payouts              Payout[]
   usageEvents          UsageEvent[]
   auditLogs            AuditLog[]
+  billingEvents        BillingEvent[]
+  treasuryTransactions TreasuryTransaction[]
 }
 
 model CompanyUser {
@@ -151,12 +155,55 @@ model AuditLog {
 
 model WebhookEvent {
   id          String   @id @default(cuid())
-  source      String
-  eventId     String
+  provider    String
+  externalId  String?
+  eventType   String
+  signature   String?
   payload     Json
-  processedAt DateTime @default(now())
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
 
-  @@unique([source, eventId])
-  @@index([source])
+  @@unique([provider, externalId])
+  @@index([provider])
+  @@index([eventType])
+  @@index([processed])
   @@index([processedAt])
+}
+
+model BillingEvent {
+  id            String   @id @default(cuid())
+  companyId     String?
+  dodoPaymentId String   @unique
+  customerEmail String?
+  amountUsd     Decimal
+  currency      String
+  status        String
+  rawPayload    Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TreasuryTransaction {
+  id            String   @id @default(cuid())
+  companyId     String?
+  signature     String   @unique
+  walletAddress String
+  amountUsdc    Decimal
+  direction     String
+  source        String?
+  destination   String?
+  slot          BigInt?
+  createdAt     DateTime @default(now())
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([walletAddress])
+  @@index([direction])
+  @@index([createdAt])
 }

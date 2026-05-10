@@ -1,14 +1,23 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, test } from "node:test";
+import { afterEach, beforeEach, describe, test } from "node:test";
 import { POST as checkoutPost } from "../../app/api/billing/checkout/route";
 import { POST as usagePost } from "../../app/api/billing/report-usage/route";
 import { POST as dodoWebhookPost } from "../../app/api/webhooks/dodo/route";
 import { signDodoPayload } from "../../lib/integrations/dodo/webhook";
+import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+let restoreDb: (() => void) | undefined;
+
+beforeEach(async () => {
+  const installed = await installPrismaTestDb();
+  restoreDb = installed.restore;
+});
 
 afterEach(() => {
+  restoreDb?.();
+  restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
 });
@@ -52,7 +61,7 @@ describe("Member 1 Dodo billing API flow", () => {
     const payload = JSON.stringify({
       id: "evt_001",
       type: "payment.succeeded",
-      data: { companyId: "company_demo_01", customerId: "cus_001", subscriptionId: "sub_001", status: "active" },
+      data: { companyId: "company_demo_01", customerId: "cus_001", subscriptionId: "sub_001", status: "paid" },
     });
     const request = new Request("http://localhost:3000/api/webhooks/dodo", {
       method: "POST",
@@ -66,6 +75,6 @@ describe("Member 1 Dodo billing API flow", () => {
     assert.equal(response.status, 200);
     assert.equal(json.received, true);
     assert.equal(json.accountUpdate.eventId, "evt_001");
-    assert.equal(json.accountUpdate.status, "active");
+    assert.equal(json.accountUpdate.status, "paid");
   });
 });

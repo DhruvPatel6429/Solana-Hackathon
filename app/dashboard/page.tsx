@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { Sparkline } from "@/components/charts";
 import { JudgeDemoPanel } from "@/components/judge-demo-panel";
 import { Skeleton } from "@/components/skeleton";
+import { WalletConnect } from "@/components/wallet-connect";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
+                <WalletConnect />
                 <Button variant="ghost">
                   <RadioTower className="h-4 w-4" />
                   Sync rates

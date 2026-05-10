@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { toHttpErrorResponse } from "@/lib/auth/http";
-import { requireTenantContext } from "@/lib/auth/server";
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { rejectInvoice } from "@/lib/services/invoice.service";
 
 type RejectInvoiceBody = {
@@ -10,44 +10,17 @@ type RejectInvoiceBody = {
   reason?: unknown;
 };
 
-function getClaimedRole(claims: Record<string, unknown>): string | undefined {
-  const appMetadata = claims.app_metadata;
-  const userMetadata = claims.user_metadata;
-
-  if (
-    typeof appMetadata === "object" &&
-    appMetadata !== null &&
-    "role" in appMetadata
-  ) {
-    return String(appMetadata.role);
-  }
-
-  if (
-    typeof userMetadata === "object" &&
-    userMetadata !== null &&
-    "role" in userMetadata
-  ) {
-    return String(userMetadata.role);
-  }
-
-  return undefined;
-}
-
 function jsonError(error: string, status: number) {
   return NextResponse.json({ success: false, error }, { status });
 }
 
 export async function PATCH(request: Request): Promise<Response> {
-  let tenant: Awaited<ReturnType<typeof requireTenantContext>>;
+  let tenant: Awaited<ReturnType<typeof requireAdmin>>;
 
   try {
-    tenant = await requireTenantContext(request);
+    tenant = await requireAdmin(request);
   } catch (error) {
     return toHttpErrorResponse(error);
-  }
-
-  if (getClaimedRole(tenant.claims) !== "admin") {
-    return jsonError("Only admins can reject invoices.", 403);
   }
 
   let body: RejectInvoiceBody;

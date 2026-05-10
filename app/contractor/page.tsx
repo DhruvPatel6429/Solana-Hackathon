@@ -184,7 +184,9 @@ export default function ContractorPortalPage() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const auth = supabase.auth as any;
+
+    auth.getSession().then(({ data: { session } }: { data: { session: { access_token?: string } | null } }) => {
       if (session?.access_token) {
         setToken(session.access_token);
       } else {
@@ -193,7 +195,7 @@ export default function ContractorPortalPage() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = auth.onAuthStateChange((_e: string, session: { access_token?: string } | null) => {
       setToken(session?.access_token ?? null);
     });
 

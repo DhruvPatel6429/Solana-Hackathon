@@ -172,7 +172,9 @@ export default function NewInvoicePage() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const auth = supabase.auth as any;
+
+    auth.getSession().then(({ data: { session } }: { data: { session: { access_token?: string } | null } }) => {
       if (!session?.access_token) {
         setAuthError("Not authenticated. Please sign in.");
         return;
@@ -193,7 +195,7 @@ export default function NewInvoicePage() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = auth.onAuthStateChange((_e: string, session: { access_token?: string } | null) => {
       setToken(session?.access_token ?? null);
     });
 

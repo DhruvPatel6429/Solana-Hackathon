@@ -71,11 +71,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { requireTenantContext } = await import("@/lib/auth/server");
+    const { requireAdmin } = await import("@/lib/auth/require-admin");
     const { listPayoutsByCompany } = await import("@/lib/db/queries/payouts");
     const { buildPayoutCsv } = await import("@/lib/audit/csv");
     const { logAuditExported } = await import("@/lib/services/audit.service");
-    const tenant = await requireTenantContext(request);
+    const tenant = await requireAdmin(request);
     const rows = await listPayoutsByCompany(tenant.companyId, filters);
 
     await logAuditExported({

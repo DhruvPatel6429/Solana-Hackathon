@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/components/framer-motion-lite";
 import { CheckCircle2, Info, XCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useAppStore } from "@/lib/store";

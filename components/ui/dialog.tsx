@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/components/framer-motion-lite";
 import { X } from "lucide-react";
 import { Button } from "./button";
 
