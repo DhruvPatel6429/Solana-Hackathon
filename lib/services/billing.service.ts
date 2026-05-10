@@ -111,6 +111,13 @@ export async function handleDodoWebhook({
   const rawPayload = JSON.parse(payload) as Record<string, unknown>;
   const status = normalizeDodoStatus(event);
   const paymentId = dodoPaymentId(event);
+  const company =
+    event.data.companyId
+      ? await db.company.findUnique({
+          where: { id: event.data.companyId },
+          select: { id: true, organizationId: true },
+        })
+      : null;
 
   const existingWebhook = await db.webhookEvent.findUnique({
     where: {
@@ -141,6 +148,8 @@ export async function handleDodoWebhook({
       },
     },
     create: {
+      organizationId: company?.organizationId ?? null,
+      companyId: company?.id ?? null,
       provider: "dodo",
       externalId: event.id,
       eventType: event.type,
@@ -149,6 +158,8 @@ export async function handleDodoWebhook({
       processed: false,
     },
     update: {
+      organizationId: company?.organizationId ?? null,
+      companyId: company?.id ?? null,
       eventType: event.type,
       signature,
       payload: rawPayload,
@@ -159,16 +170,10 @@ export async function handleDodoWebhook({
 
   try {
     await prisma.$transaction(async (tx) => {
-      const company = event.data.companyId
-        ? await (tx as any).company.findUnique({
-            where: { id: event.data.companyId },
-            select: { id: true },
-          })
-        : null;
-
       await (tx as any).billingEvent.upsert({
         where: { dodoPaymentId: paymentId },
         create: {
+          organizationId: company?.organizationId ?? null,
           companyId: company?.id,
           dodoPaymentId: paymentId,
           customerEmail: event.data.customerEmail,
@@ -178,6 +183,7 @@ export async function handleDodoWebhook({
           rawPayload,
         },
         update: {
+          organizationId: company?.organizationId ?? null,
           companyId: company?.id,
           customerEmail: event.data.customerEmail,
           amountUsd: decimalString(event.data.amountUsd ?? event.data.amount),

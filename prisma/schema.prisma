@@ -24,17 +24,62 @@ enum InvoiceStatus {
   PAID
 }
 
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  FINANCE
+  COMPLIANCE
+  VIEWER
+}
+
+enum ComplianceSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplianceStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Organization {
+  id                String                     @id @default(cuid())
+  name              String
+  slug              String                     @unique
+  status            String                     @default("ACTIVE")
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  companies         Company[]
+  members           OrganizationMember[]
+  apiKeys           ApiKey[]
+  partnerIntegrations PartnerIntegration[]
+  complianceAlerts  ComplianceAlert[]
+  governancePolicies GovernancePolicy[]
+  recoverySnapshots DisasterRecoverySnapshot[]
+}
+
 model Company {
   id                   String       @id @default(cuid())
+  organizationId       String?
   name                 String
   planTier             String?
   dodoCustomerId       String?
   dodoSubscriptionId   String?
   treasuryWalletAddress String?
+  feeWalletAddress     String?
   treasuryBalanceUsdc  Decimal      @default(0)
   treasuryBalanceUpdatedAt DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
+  organization         Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   users                CompanyUser[]
   contractors          Contractor[]
   invoices             Invoice[]
@@ -43,20 +88,32 @@ model Company {
   auditLogs            AuditLog[]
   billingEvents        BillingEvent[]
   treasuryTransactions TreasuryTransaction[]
+  apiKeys              ApiKey[]
+  partnerIntegrations  PartnerIntegration[]
+  partnerWebhookSubscriptions PartnerWebhookSubscription[]
+  complianceAlerts     ComplianceAlert[]
+  governancePolicies   GovernancePolicy[]
+  recoverySnapshots    DisasterRecoverySnapshot[]
+
+  @@index([organizationId])
 }
 
 model CompanyUser {
   id        String   @id @default(cuid())
+  organizationId String?
   companyId String
   userId    String   @unique
+  role      String   @default("admin")
   createdAt DateTime @default(now())
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@index([companyId])
 }
 
 model Contractor {
   id               String    @id @default(cuid())
+  organizationId   String?
   companyId        String
   name             String
   email            String    @default("")
@@ -73,12 +130,14 @@ model Contractor {
   invoices         Invoice[]
   payouts          Payout[]
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([kycStatus])
 }
 
 model Invoice {
   id           String    @id @default(cuid())
+  organizationId String?
   companyId    String
   contractorId String
   amountUsdc   Decimal
@@ -95,6 +154,7 @@ model Invoice {
   contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
   payouts      Payout[]
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([contractorId])
   @@index([status])
@@ -102,6 +162,7 @@ model Invoice {
 
 model Payout {
   id               String    @id @default(cuid())
+  organizationId   String?
   companyId        String?
   contractorId     String?
   invoiceId        String
@@ -118,6 +179,7 @@ model Payout {
   invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@unique([invoiceId])
+  @@index([organizationId])
   @@index([companyId])
   @@index([contractorId])
   @@index([companyId, status])
@@ -129,18 +191,21 @@ model Payout {
 
 model UsageEvent {
   id         String   @id @default(cuid())
+  organizationId String?
   companyId  String
   eventType  String
   dodoEventId String?
   reportedAt DateTime @default(now())
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([eventType])
 }
 
 model AuditLog {
   id          String   @id @default(cuid())
+  organizationId String?
   companyId   String
   action      String
   actorUserId String?
@@ -148,6 +213,7 @@ model AuditLog {
   createdAt   DateTime @default(now())
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([createdAt])
   @@index([action])
@@ -155,6 +221,8 @@ model AuditLog {
 
 model WebhookEvent {
   id          String   @id @default(cuid())
+  organizationId String?
+  companyId   String?
   provider    String
   externalId  String?
   eventType   String
@@ -165,6 +233,8 @@ model WebhookEvent {
   createdAt   DateTime @default(now())
 
   @@unique([provider, externalId])
+  @@index([organizationId])
+  @@index([companyId])
   @@index([provider])
   @@index([eventType])
   @@index([processed])
@@ -173,6 +243,7 @@ model WebhookEvent {
 
 model BillingEvent {
   id            String   @id @default(cuid())
+  organizationId String?
   companyId     String?
   dodoPaymentId String   @unique
   customerEmail String?
@@ -184,6 +255,7 @@ model BillingEvent {
   updatedAt     DateTime @updatedAt
   company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([status])
   @@index([createdAt])
@@ -191,6 +263,7 @@ model BillingEvent {
 
 model TreasuryTransaction {
   id            String   @id @default(cuid())
+  organizationId String?
   companyId     String?
   signature     String   @unique
   walletAddress String
@@ -202,6 +275,7 @@ model TreasuryTransaction {
   createdAt     DateTime @default(now())
   company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([walletAddress])
   @@index([direction])
@@ -210,6 +284,8 @@ model TreasuryTransaction {
 
 model FailedJob {
   id             String    @id @default(cuid())
+  organizationId String?
+  companyId      String?
   jobType        String
   entityType     String?
   entityId       String?
@@ -224,6 +300,8 @@ model FailedJob {
   updatedAt      DateTime  @updatedAt
   resolvedAt     DateTime?
 
+  @@index([organizationId])
+  @@index([companyId])
   @@index([jobType])
   @@index([status])
   @@index([nextRetryAt])
@@ -232,6 +310,8 @@ model FailedJob {
 
 model DeadLetterWebhook {
   id             String    @id @default(cuid())
+  organizationId String?
+  companyId      String?
   provider       String
   externalId     String?
   eventType      String?
@@ -247,6 +327,8 @@ model DeadLetterWebhook {
   processedAt    DateTime?
 
   @@unique([provider, externalId])
+  @@index([organizationId])
+  @@index([companyId])
   @@index([provider])
   @@index([status])
   @@index([nextRetryAt])
@@ -255,6 +337,7 @@ model DeadLetterWebhook {
 
 model ReconciliationAudit {
   id             String   @id @default(cuid())
+  organizationId String?
   companyId      String?
   scope          String
   entityType     String?
@@ -270,10 +353,139 @@ model ReconciliationAudit {
   createdAt      DateTime @default(now())
   resolvedAt     DateTime?
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([scope])
   @@index([severity])
   @@index([status])
   @@index([createdAt])
   @@index([entityType, entityId])
+}
+
+model OrganizationMember {
+  id             String                  @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationMemberRole @default(ADMIN)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model ApiKey {
+  id               String       @id @default(cuid())
+  organizationId   String
+  companyId        String?
+  name             String
+  keyPrefix        String
+  keyHash          String       @unique
+  scopes           Json
+  status           ApiKeyStatus @default(ACTIVE)
+  expiresAt        DateTime?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  createdByUserId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company          Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([companyId])
+}
+
+model PartnerIntegration {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  companyId             String?
+  partnerName           String
+  partnerReference      String?
+  embeddingEnabled      Boolean      @default(false)
+  brandedConfiguration  Json?
+  payoutApiEnabled      Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company               Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  webhookSubscriptions  PartnerWebhookSubscription[]
+
+  @@index([organizationId])
+  @@index([companyId])
+}
+
+model PartnerWebhookSubscription {
+  id                   String             @id @default(cuid())
+  organizationId       String
+  companyId            String?
+  partnerIntegrationId String
+  targetUrl            String
+  eventTypes           Json
+  secretHash           String
+  status               String             @default("ACTIVE")
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  partnerIntegration   PartnerIntegration @relation(fields: [partnerIntegrationId], references: [id], onDelete: Cascade)
+  company              Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([companyId])
+  @@index([partnerIntegrationId])
+}
+
+model ComplianceAlert {
+  id                  String             @id @default(cuid())
+  organizationId      String
+  companyId           String?
+  scope               String
+  severity            ComplianceSeverity @default(MEDIUM)
+  status              ComplianceStatus   @default(OPEN)
+  entityType          String?
+  entityId            String?
+  thresholdRule       String?
+  amountUsdc          Decimal?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  resolvedAt          DateTime?
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company             Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([companyId])
+  @@index([severity])
+}
+
+model GovernancePolicy {
+  id               String       @id @default(cuid())
+  organizationId   String
+  companyId        String?
+  policyType       String
+  value            Json
+  status           String       @default("ACTIVE")
+  createdByUserId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company          Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, policyType])
+  @@index([companyId])
+}
+
+model DisasterRecoverySnapshot {
+  id                String       @id @default(cuid())
+  organizationId    String
+  companyId         String?
+  snapshotType      String
+  reference         String?
+  payload           Json
+  createdAt         DateTime     @default(now())
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company           Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, snapshotType])
+  @@index([companyId])
 }

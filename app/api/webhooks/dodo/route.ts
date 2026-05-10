@@ -14,6 +14,21 @@ export async function POST(request: Request) {
       return { raw: payload };
     }
   };
+  const payloadObject = safePayload() as any;
+  const payloadCompanyId =
+    typeof payloadObject?.data?.companyId === "string"
+      ? payloadObject.data.companyId
+      : undefined;
+  let payloadOrganizationId: string | undefined;
+  if (payloadCompanyId) {
+    const { prisma } = await import("@/lib/db/prisma");
+    const db = prisma as any;
+    const company = await db.company.findUnique({
+      where: { id: payloadCompanyId },
+      select: { organizationId: true },
+    }).catch(() => null);
+    payloadOrganizationId = company?.organizationId ?? undefined;
+  }
 
   try {
     const freshness = assertWebhookFreshness(request);
@@ -29,6 +44,8 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Invalid Dodo webhook.";
     await webhookRecoveryService.recordFailure({
       provider: "dodo",
+      companyId: payloadCompanyId,
+      organizationId: payloadOrganizationId,
       externalId,
       signature,
       payload: safePayload(),

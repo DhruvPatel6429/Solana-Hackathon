@@ -12,6 +12,8 @@ export class WebhookRecoveryService {
   async recordFailure(input: {
     provider: string;
     externalId?: string | null;
+    organizationId?: string | null;
+    companyId?: string | null;
     eventType?: string | null;
     signature?: string | null;
     nonce?: string | null;
@@ -30,6 +32,8 @@ export class WebhookRecoveryService {
         },
       },
       create: {
+        organizationId: input.organizationId ?? null,
+        companyId: input.companyId ?? null,
         provider: input.provider,
         externalId,
         eventType: input.eventType,
@@ -43,6 +47,8 @@ export class WebhookRecoveryService {
         correlationId: input.correlationId,
       },
       update: {
+        organizationId: input.organizationId ?? null,
+        companyId: input.companyId ?? null,
         status: "PENDING_REPLAY",
         nextRetryAt: nextRetry(0),
         lastError: message,

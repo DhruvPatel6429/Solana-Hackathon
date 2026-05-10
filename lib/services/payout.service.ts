@@ -159,6 +159,7 @@ export async function executePayout(
     where: { id: invoiceId },
     select: {
       companyId: true,
+      organizationId: true,
       contractorId: true,
       status: true,
       approvedAt: true,
@@ -179,11 +180,20 @@ export async function executePayout(
     );
   }
 
+  const { evaluatePayoutCompliance } = await import("@/lib/services/compliance.service");
+  await evaluatePayoutCompliance({
+    companyId: invoice.companyId,
+    invoiceId,
+    amountUsdc: amount,
+    wallet,
+  });
+
   try {
     if (existingPayout?.status === "FAILED") {
       payout = await db.payout.update({
         where: { id: existingPayout.id },
         data: {
+          organizationId: invoice.organizationId ?? null,
           companyId: invoice.companyId,
           contractorId: invoice.contractorId,
           contractorWallet: wallet,
@@ -198,6 +208,7 @@ export async function executePayout(
     } else {
       payout = await db.payout.create({
         data: {
+          organizationId: invoice.organizationId ?? null,
           companyId: invoice.companyId,
           contractorId: invoice.contractorId,
           invoiceId,
