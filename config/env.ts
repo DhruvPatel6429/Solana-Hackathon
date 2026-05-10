@@ -103,7 +103,11 @@ export function validateProductionEnv(env = process.env): {
 }
 
 export function assertValidProductionEnv(): void {
-  if (process.env.NODE_ENV !== "production") {
+  const isNextProductionBuild =
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.npm_lifecycle_event === "build";
+
+  if (process.env.NODE_ENV !== "production" || isNextProductionBuild) {
     return;
   }
 
