@@ -195,6 +195,10 @@ CREATE INDEX IF NOT EXISTS "DeadLetterWebhook_organizationId_idx" ON "DeadLetter
 CREATE INDEX IF NOT EXISTS "DeadLetterWebhook_companyId_idx" ON "DeadLetterWebhook"("companyId");
 CREATE INDEX IF NOT EXISTS "ReconciliationAudit_organizationId_idx" ON "ReconciliationAudit"("organizationId");
 
-ALTER TABLE "Company"
-  ADD CONSTRAINT IF NOT EXISTS "Company_organizationId_fkey"
-  FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Company"
+    ADD CONSTRAINT "Company_organizationId_fkey"
+    FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
