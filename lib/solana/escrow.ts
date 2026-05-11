@@ -1,10 +1,8 @@
+import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import BN from "bn.js";
+import bs58 from "bs58";
 import {
-  AnchorProvider,
-  Idl,
-  Program,
-} from "@project-serum/anchor";
-import { createRequire } from "node:module";
-import {
+  Keypair,
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
@@ -17,92 +15,40 @@ import {
 } from "@solana/spl-token";
 
 import { connection } from "./connection";
+import escrowIdl from "./idl/escrow.json";
 import { DEVNET_USDC_MINT, getUSDCAccount, USDC_DECIMALS } from "./tokens";
-import { treasuryWallet } from "./wallet";
 
-const DEFAULT_ESCROW_PROGRAM_ID = "HukqmD9GfmVya8ASPrY7ELEmuJXy8PxA4Mvm7PsQEjgE";
-const require = createRequire(import.meta.url);
-const { BN } = require("@project-serum/anchor") as { BN: any };
+const DEFAULT_ESCROW_PROGRAM_ID = "9MtY5vEpJCf31Ak19wfJ25Ef5bdVvs9nzoxeh3yEf4FB";
 
 export const ESCROW_PROGRAM_ID = new PublicKey(
   process.env.ESCROW_PROGRAM_ID ?? DEFAULT_ESCROW_PROGRAM_ID,
 );
 
-const ESCROW_IDL = {
-  version: "0.1.0",
-  name: "escrow",
-  instructions: [
-    {
-      name: "initializeEscrow",
-      accounts: [
-        { name: "authority", isMut: true, isSigner: true },
-        { name: "mint", isMut: false, isSigner: false },
-        { name: "escrow", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "associatedTokenProgram", isMut: false, isSigner: false },
-        { name: "rent", isMut: false, isSigner: false },
-      ],
-      args: [{ name: "invoiceId", type: { array: ["u8", 32] } }],
-    },
-    {
-      name: "deposit",
-      accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "escrow", isMut: true, isSigner: false },
-        { name: "mint", isMut: false, isSigner: false },
-        { name: "userTokenAccount", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-      ],
-      args: [{ name: "amount", type: "u64" }],
-    },
-    {
-      name: "release",
-      accounts: [
-        { name: "authority", isMut: true, isSigner: true },
-        { name: "escrow", isMut: true, isSigner: false },
-        { name: "mint", isMut: false, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "contractor", isMut: false, isSigner: false },
-        { name: "contractorTokenAccount", isMut: true, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "associatedTokenProgram", isMut: false, isSigner: false },
-        { name: "rent", isMut: false, isSigner: false },
-      ],
-      args: [],
-    },
-  ],
-  accounts: [
-    {
-      name: "EscrowAccount",
-      type: {
-        kind: "struct",
-        fields: [
-          { name: "authority", type: "publicKey" },
-          { name: "mint", type: "publicKey" },
-          { name: "vault", type: "publicKey" },
-          { name: "amount", type: "u64" },
-          { name: "isReleased", type: "bool" },
-          { name: "bump", type: "u8" },
-          { name: "invoiceId", type: { array: ["u8", 32] } },
-        ],
-      },
-    },
-  ],
-  errors: [
-    { code: 6000, name: "Unauthorized", msg: "Only the escrow authority can release funds." },
-    { code: 6001, name: "AlreadyReleased", msg: "Escrow funds have already been released." },
-    {
-      code: 6002,
-      name: "InvalidAmount",
-      msg: "Amount must be greater than zero and fit safely in escrow state.",
-    },
-    { code: 6003, name: "InvalidAuthority", msg: "Signer does not match the escrow authority." },
-  ],
-} as unknown as Idl;
+const ESCROW_IDL = normalizeIdl(escrowIdl as unknown as Idl);
+
+function normalizeIdl(idl: Idl): Idl {
+  const normalized = structuredClone(idl) as any;
+
+  normalized.address = ESCROW_PROGRAM_ID.toBase58();
+  if (normalized.metadata) {
+    normalized.metadata.address = ESCROW_PROGRAM_ID.toBase58();
+  }
+
+  normalized.instructions = normalized.instructions?.map((instruction: any) => ({
+    ...instruction,
+    discriminator: Buffer.from(instruction.discriminator),
+  }));
+  normalized.accounts = normalized.accounts?.map((account: any) => ({
+    ...account,
+    discriminator: Buffer.from(account.discriminator),
+  }));
+  normalized.events = normalized.events?.map((event: any) => ({
+    ...event,
+    discriminator: Buffer.from(event.discriminator),
+  }));
+
+  return normalized as Idl;
+}
 
 type EscrowAccountData = {
   authority: PublicKey;
@@ -111,7 +57,7 @@ type EscrowAccountData = {
   amount: InstanceType<typeof BN>;
   isReleased: boolean;
   bump: number;
-  invoiceId: number[];
+  invoiceId: number[] | Uint8Array;
 };
 
 export type ReleaseEscrowParams = {
@@ -190,17 +136,68 @@ export class EscrowDepositError extends EscrowReleaseError {
   }
 }
 
+let cachedTreasuryWallet: Keypair | null = null;
+
+function getTreasuryWallet(): Keypair {
+  if (cachedTreasuryWallet) {
+    return cachedTreasuryWallet;
+  }
+
+  const secretKey = process.env.TREASURY_WALLET_SECRET_KEY?.trim();
+
+  if (!secretKey) {
+    throw new EscrowReleaseError(
+      "[solana:wallet] Missing TREASURY_WALLET_SECRET_KEY. Provide the treasury private key as a base58-encoded 64-byte secret key.",
+    );
+  }
+
+  let decoded: Uint8Array;
+  try {
+    decoded = bs58.decode(secretKey);
+  } catch (error) {
+    throw new EscrowReleaseError("[solana:wallet] Invalid TREASURY_WALLET_SECRET_KEY.", error);
+  }
+
+  if (decoded.length !== 64) {
+    throw new EscrowReleaseError(
+      `[solana:wallet] Invalid TREASURY_WALLET_SECRET_KEY: expected 64 bytes, received ${decoded.length}.`,
+    );
+  }
+
+  cachedTreasuryWallet = Keypair.fromSecretKey(decoded);
+  return cachedTreasuryWallet;
+}
+
+function getTreasuryPublicKey(): PublicKey {
+  const treasuryAddress = process.env.TREASURY_WALLET_ADDRESS?.trim();
+
+  if (treasuryAddress) {
+    try {
+      return new PublicKey(treasuryAddress);
+    } catch (error) {
+      throw new EscrowReleaseError(
+        `[solana:wallet] Invalid TREASURY_WALLET_ADDRESS: ${treasuryAddress}`,
+        error,
+      );
+    }
+  }
+
+  return getTreasuryWallet().publicKey;
+}
+
 class TreasuryAnchorWallet {
-  public readonly publicKey = treasuryWallet.publicKey;
+  get publicKey(): PublicKey {
+    return getTreasuryPublicKey();
+  }
 
   async signTransaction<T extends Transaction>(transaction: T): Promise<T> {
-    transaction.partialSign(treasuryWallet);
+    transaction.partialSign(getTreasuryWallet());
     return transaction;
   }
 
   async signAllTransactions<T extends Transaction>(transactions: T[]): Promise<T[]> {
     return transactions.map((transaction) => {
-      transaction.partialSign(treasuryWallet);
+      transaction.partialSign(getTreasuryWallet());
       return transaction;
     });
   }
@@ -217,7 +214,7 @@ function getEscrowProgram(): Program {
     },
   );
 
-  return new Program(ESCROW_IDL, ESCROW_PROGRAM_ID, provider);
+  return new Program(ESCROW_IDL, provider);
 }
 
 export function invoiceIdToBytes(invoiceId: string): Uint8Array {
@@ -291,7 +288,7 @@ export function deriveEscrowPda(invoiceId: string): {
   const [escrowPda, bump] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("escrow"),
-      treasuryWallet.publicKey.toBuffer(),
+      getTreasuryPublicKey().toBuffer(),
       Buffer.from(invoiceIdBytes),
     ],
     ESCROW_PROGRAM_ID,
@@ -334,10 +331,24 @@ async function fetchEscrowAccount(
   program: Program,
   escrowPda: PublicKey,
 ): Promise<EscrowAccountData | null> {
-  return (await (program.account as any).escrowAccount.fetchNullable(
+  const raw = (await (program.account as any).escrowAccount.fetchNullable(
     escrowPda,
     "finalized",
-  )) as EscrowAccountData | null;
+  )) as Record<string, unknown> | null;
+
+  if (!raw) {
+    return null;
+  }
+
+  return {
+    authority: raw.authority as PublicKey,
+    mint: raw.mint as PublicKey,
+    vault: raw.vault as PublicKey,
+    amount: raw.amount as InstanceType<typeof BN>,
+    isReleased: (raw.isReleased ?? raw.is_released) as boolean,
+    bump: raw.bump as number,
+    invoiceId: (raw.invoiceId ?? raw.invoice_id) as number[] | Uint8Array,
+  };
 }
 
 function parseContractorWallet(contractorWallet: string): PublicKey {
@@ -397,6 +408,7 @@ async function confirmFinalized(signature: string, label: string): Promise<void>
 export async function initializeEscrow({
   invoiceId,
 }: InitializeEscrowParams): Promise<InitializeEscrowResult> {
+  const treasuryWallet = getTreasuryWallet();
   const program = getEscrowProgram();
   const { escrowPda, invoiceIdBytes } = deriveEscrowPda(invoiceId);
   const vault = getAssociatedTokenAddressSync(
@@ -438,7 +450,7 @@ export async function initializeEscrow({
 
   try {
     const signature = await program.methods
-      .initializeEscrow(Array.from(invoiceIdBytes))
+      .initializeEscrow(Buffer.from(invoiceIdBytes))
       .accounts({
         authority: treasuryWallet.publicKey,
         mint: DEVNET_USDC_MINT,
@@ -493,6 +505,7 @@ export async function depositEscrow({
   invoiceId,
   amount,
 }: DepositEscrowParams): Promise<DepositEscrowResult> {
+  const treasuryWallet = getTreasuryWallet();
   const amountBaseUnits = toUSDCBaseUnits(amount);
   const program = getEscrowProgram();
   const { escrowPda } = deriveEscrowPda(invoiceId);
@@ -608,6 +621,7 @@ export async function releaseEscrow({
   invoiceId,
   contractorWallet,
 }: ReleaseEscrowParams): Promise<ReleaseEscrowResult> {
+  const treasuryWallet = getTreasuryWallet();
   const contractor = parseContractorWallet(contractorWallet);
   const program = getEscrowProgram();
   const { escrowPda } = deriveEscrowPda(invoiceId);

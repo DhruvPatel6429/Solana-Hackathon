@@ -54,6 +54,15 @@ declare module "framer-motion" {
   export const motion: Record<string, React.ComponentType<any>>;
 }
 
+declare module "bn.js" {
+  export default class BN {
+    constructor(value: string | number | bigint | BN, base?: number);
+    toString(base?: number): string;
+    eq(value: BN): boolean;
+    gt(value: BN): boolean;
+  }
+}
+
 declare module "@solana/web3.js" {
   export type Commitment = "processed" | "confirmed" | "finalized";
 

@@ -7,7 +7,7 @@ export class SolanaGuardError extends Error {
   }
 }
 
-const DEFAULT_ESCROW_PROGRAM_ID = "HukqmD9GfmVya8ASPrY7ELEmuJXy8PxA4Mvm7PsQEjgE";
+const DEFAULT_ESCROW_PROGRAM_ID = "9MtY5vEpJCf31Ak19wfJ25Ef5bdVvs9nzoxeh3yEf4FB";
 
 function parseCsvSet(value?: string): Set<string> {
   return new Set(

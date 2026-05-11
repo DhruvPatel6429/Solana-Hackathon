@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
   });
 
   await runCheck(checks, "PDA derivation consistency", async () => {
-    validationInvoiceId = `anchor_validate_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+    validationInvoiceId = randomBytes(32).toString("hex");
     const invoiceBytes = invoiceIdToBytes(validationInvoiceId);
     const fromHelper = deriveEscrowPda(validationInvoiceId);
     const fromNative = PublicKey.findProgramAddressSync(
@@ -257,5 +258,10 @@ async function main(): Promise<void> {
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`[phase4] validate-anchor-deployment failed: ${message}`);
+  if (error instanceof Error && error.stack) {
+    console.error(error.stack);
+  } else {
+    console.error(error);
+  }
   process.exitCode = 1;
 });

@@ -22,6 +22,10 @@ import { prisma } from "../lib/db/prisma";
 
 const db = prisma as any;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function main(): Promise<void> {
   const checks = [] as Awaited<ReturnType<typeof buildReport>>["checks"];
 
@@ -32,6 +36,7 @@ async function main(): Promise<void> {
   const heliusUrl = webhookUrlsFromEnv().helius;
 
   const contractor = parsePublicKey(requiredEnv("TEST_CONTRACTOR_WALLET"), "TEST_CONTRACTOR_WALLET");
+  const monitoredWallets = [treasury.publicKey.toBase58(), contractor.toBase58()];
   const transferAmount = Number(process.env.HELIUS_VALIDATION_TRANSFER_USDC ?? "0.01");
   assertCondition(transferAmount > 0, "HELIUS_VALIDATION_TRANSFER_USDC must be positive.");
 
@@ -42,19 +47,25 @@ async function main(): Promise<void> {
   let firstWebhookStatus = 0;
   let replayStatus = 0;
   let nonceReplayStatus = 0;
+  let seededCompanyInitialTreasuryBalanceUpdatedAt: Date | null = null;
+  let baselineTimestampByCompanyIdBeforeWebhook = new Map<string, number>();
 
   await runCheck(checks, "Seed company for treasury webhook persistence", async () => {
-    await db.company.create({
+    const company = await db.company.create({
       data: {
         id: companyId,
         name: `Phase4 Helius Company ${runId}`,
         treasuryWalletAddress: treasury.publicKey.toBase58(),
       },
     });
+    seededCompanyInitialTreasuryBalanceUpdatedAt = company.treasuryBalanceUpdatedAt
+      ? new Date(company.treasuryBalanceUpdatedAt)
+      : null;
 
     return {
       companyId,
       treasuryWallet: treasury.publicKey.toBase58(),
+      seededCompanyInitialTreasuryBalanceUpdatedAt,
     };
   });
 
@@ -69,6 +80,42 @@ async function main(): Promise<void> {
       transferSignature,
       explorerUrl: explorerTxUrl(transferSignature),
       transferAmount,
+    };
+  });
+
+  await runCheck(checks, "Capture pre-webhook treasury timestamp baseline", async () => {
+    const baselineCompanies = (await db.company.findMany({
+      where: {
+        treasuryWalletAddress: {
+          in: monitoredWallets,
+        },
+      },
+      select: {
+        id: true,
+        treasuryBalanceUpdatedAt: true,
+      },
+    })) as Array<{ id: string; treasuryBalanceUpdatedAt: Date | null }>;
+
+    baselineTimestampByCompanyIdBeforeWebhook = new Map<string, number>(
+      baselineCompanies.map((item) => [
+        item.id,
+        item.treasuryBalanceUpdatedAt ? new Date(item.treasuryBalanceUpdatedAt).getTime() : 0,
+      ]),
+    );
+
+    console.info("[phase4] Captured pre-webhook treasury timestamp baseline", {
+      monitoredWallets,
+      baselineByCompanyId: Object.fromEntries(
+        Array.from(baselineTimestampByCompanyIdBeforeWebhook.entries()).map(([id, ms]) => [
+          id,
+          ms ? new Date(ms).toISOString() : null,
+        ]),
+      ),
+    });
+
+    return {
+      monitoredWallets,
+      baselineCompanyCount: baselineTimestampByCompanyIdBeforeWebhook.size,
     };
   });
 
@@ -120,25 +167,120 @@ async function main(): Promise<void> {
   });
 
   await runCheck(checks, "Verify treasury persistence + balance update", async () => {
-    const [txRecord, company] = await Promise.all([
-      db.treasuryTransaction.findUnique({
+    const pollTimeoutMs = 30_000;
+    const pollIntervalMs = 1_000;
+    const pollStartMs = Date.now();
+
+    let txRecord: any = null;
+    let company: any = null;
+    let baselineFound = false;
+    let baselineTimestampMs = 0;
+    let latestTimestampMs: number | null = null;
+    let attempt = 0;
+
+    console.info("[phase4] Treasury timestamp poll started", {
+      transferSignature,
+      pollTimeoutMs,
+      pollIntervalMs,
+      monitoredWallets,
+      seededCompanyId: companyId,
+      seededCompanyInitialTreasuryBalanceUpdatedAt:
+        seededCompanyInitialTreasuryBalanceUpdatedAt?.toISOString() ?? null,
+      baselineByCompanyId: Object.fromEntries(
+        Array.from(baselineTimestampByCompanyIdBeforeWebhook.entries()).map(([id, ms]) => [id, ms ? new Date(ms).toISOString() : null]),
+      ),
+    });
+
+    while (Date.now() - pollStartMs <= pollTimeoutMs) {
+      attempt += 1;
+
+      txRecord = await db.treasuryTransaction.findUnique({
         where: { signature: transferSignature },
-      }),
-      db.company.findUnique({ where: { id: companyId } }),
-    ]);
+      });
+
+      company = txRecord?.companyId
+        ? await db.company.findUnique({ where: { id: txRecord.companyId } })
+        : null;
+
+      baselineFound = txRecord?.companyId
+        ? baselineTimestampByCompanyIdBeforeWebhook.has(txRecord.companyId)
+        : false;
+      baselineTimestampMs = txRecord?.companyId
+        ? (baselineTimestampByCompanyIdBeforeWebhook.get(txRecord.companyId) ?? 0)
+        : 0;
+
+      latestTimestampMs = company?.treasuryBalanceUpdatedAt
+        ? new Date(company.treasuryBalanceUpdatedAt).getTime()
+        : null;
+      const timestampAdvanced = latestTimestampMs !== null && latestTimestampMs > baselineTimestampMs;
+      const elapsedMs = Date.now() - pollStartMs;
+
+      console.info("[phase4] Treasury timestamp poll tick", {
+        attempt,
+        elapsedMs,
+        txFound: Boolean(txRecord),
+        txCompanyId: txRecord?.companyId ?? null,
+        companyFound: Boolean(company),
+        baselineFound,
+        baselineTimestamp: baselineTimestampMs ? new Date(baselineTimestampMs).toISOString() : null,
+        polledTimestamp: latestTimestampMs ? new Date(latestTimestampMs).toISOString() : null,
+        timestampDeltaMs:
+          latestTimestampMs !== null ? latestTimestampMs - baselineTimestampMs : null,
+        timestampAdvanced,
+      });
+
+      if (txRecord && company && timestampAdvanced) {
+        break;
+      }
+
+      await sleep(pollIntervalMs);
+    }
 
     assertCondition(Boolean(txRecord), `TreasuryTransaction missing for ${transferSignature}.`);
-    assertCondition(Boolean(company), `Company ${companyId} missing.`);
-    assertCondition(Boolean(company.treasuryBalanceUpdatedAt), "Treasury balance timestamp was not updated.");
+    assertCondition(
+      Boolean(txRecord?.companyId),
+      `TreasuryTransaction ${transferSignature} is missing companyId linkage.`,
+    );
+    assertCondition(
+      Boolean(company),
+      `Company ${txRecord?.companyId ?? "unknown"} missing for treasury transaction ${transferSignature}.`,
+    );
+    assertCondition(
+      baselineFound,
+      `Missing baseline timestamp snapshot for company ${txRecord.companyId}.`,
+    );
+    assertCondition(
+      latestTimestampMs !== null,
+      `Treasury balance timestamp was not updated for company ${txRecord.companyId}.`,
+    );
+    assertCondition(
+      latestTimestampMs > baselineTimestampMs,
+      `Treasury balance timestamp was not updated. companyId=${txRecord.companyId} baseline=${baselineTimestampMs ? new Date(baselineTimestampMs).toISOString() : "null"} latest=${company.treasuryBalanceUpdatedAt?.toISOString?.() ?? String(company.treasuryBalanceUpdatedAt)}.`,
+    );
+
+    console.info("[phase4] Treasury timestamp poll completed", {
+      elapsedMs: Date.now() - pollStartMs,
+      txCompanyId: txRecord.companyId,
+      baselineTimestamp: baselineTimestampMs ? new Date(baselineTimestampMs).toISOString() : null,
+      finalTimestamp: latestTimestampMs ? new Date(latestTimestampMs).toISOString() : null,
+      finalTimestampDeltaMs:
+        latestTimestampMs !== null ? latestTimestampMs - baselineTimestampMs : null,
+    });
 
     const liveTreasury = await getUsdcBalance(connection, treasury.publicKey, mint);
 
     return {
       treasuryTransactionId: txRecord.id,
+      companyId: txRecord.companyId,
       direction: txRecord.direction,
       amountUsdc: txRecord.amountUsdc?.toString?.() ?? txRecord.amountUsdc,
       companyBalanceUsdc: company.treasuryBalanceUsdc?.toString?.() ?? company.treasuryBalanceUsdc,
       treasuryBalanceUpdatedAt: company.treasuryBalanceUpdatedAt,
+      treasuryBalanceBaseline: baselineTimestampMs
+        ? new Date(baselineTimestampMs).toISOString()
+        : null,
+      treasuryBalanceTimestampDeltaMs:
+        latestTimestampMs !== null ? latestTimestampMs - baselineTimestampMs : null,
       liveTreasury,
     };
   });

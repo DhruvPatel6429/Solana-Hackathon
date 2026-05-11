@@ -14,7 +14,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
       NEXT_PUBLIC_SOLANA_RPC_URL: https://api.devnet.solana.com
       TREASURY_WALLET_ADDRESS: 11111111111111111111111111111111
-      ESCROW_PROGRAM_ID: HukqmD9GfmVya8ASPrY7ELEmuJXy8PxA4Mvm7PsQEjgE
+      ESCROW_PROGRAM_ID: 9MtY5vEpJCf31Ak19wfJ25Ef5bdVvs9nzoxeh3yEf4FB
       HELIUS_WEBHOOK_SECRET: ci-placeholder
       DODO_WEBHOOK_SECRET: ci-placeholder
       APP_ORIGIN: http://localhost:3000
