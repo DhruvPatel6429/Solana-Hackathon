@@ -1,34 +1,46 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
-import { createCheckoutSession, handleDodoWebhook, reportUsageUnit } from "../../lib/services/billing.service";
+import { createCheckoutSession, handleDodoWebhook, reconcileBillingState, reportUsageUnit } from "../../lib/services/billing.service";
 import { signDodoPayload } from "../../lib/integrations/dodo/webhook";
 import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+const originalGrowthProduct = process.env.DODO_GROWTH_PRODUCT_ID;
 const originalFetch = globalThis.fetch;
 let restoreDb: (() => void) | undefined;
 
 beforeEach(async () => {
   process.env.DODO_API_KEY = "dodo_test_api_key";
+  process.env.DODO_GROWTH_PRODUCT_ID = "pdt_growth_test";
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.includes("/v1/checkout/sessions")) {
+    if (url.includes("/checkouts/cks_growth_test")) {
       return new Response(
         JSON.stringify({
-          checkoutUrl: "https://billing.example/checkout?checkout=growth",
-          customerId: "dodo_cus_demo_growth",
-          subscriptionId: "dodo_sub_demo_growth",
+          id: "cks_growth_test",
+          payment_id: "pay_growth_test",
+          payment_status: "succeeded",
+          customer_email: "buyer@example.com",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }
 
-    if (url.includes("/v1/usage/events")) {
+    if (url.includes("/checkouts")) {
       return new Response(
         JSON.stringify({
-          success: true,
-          usageEventId: "usage_tx_demo_001",
+          checkout_url: "https://billing.example/checkout?checkout=growth",
+          session_id: "cks_growth_test",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    if (url.includes("/events/ingest")) {
+      return new Response(
+        JSON.stringify({
+          ingested_count: 1,
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -43,7 +55,7 @@ beforeEach(async () => {
   const installed = await installPrismaTestDb();
   restoreDb = installed.restore;
   await installed.prisma.company.create({
-    data: { id: "company_demo_01", name: "Demo Billing Co" },
+    data: { id: "company_demo_01", name: "Demo Billing Co", dodoCustomerId: "cus_demo_01" },
   });
 });
 
@@ -52,6 +64,7 @@ afterEach(() => {
   restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
+  process.env.DODO_GROWTH_PRODUCT_ID = originalGrowthProduct;
   globalThis.fetch = originalFetch;
 });
 
@@ -64,8 +77,8 @@ describe("Dodo billing service", () => {
     });
 
     assert.equal(checkout.url.includes("checkout=growth"), true);
-    assert.equal(checkout.customerId, "dodo_cus_demo_growth");
-    assert.equal(checkout.subscriptionId, "dodo_sub_demo_growth");
+    assert.equal(checkout.customerId, "cus_demo_01");
+    assert.equal(checkout.subscriptionId, "");
   });
 
   test("reports one usage unit for invoice, payout, or FX events", async () => {
@@ -77,6 +90,24 @@ describe("Dodo billing service", () => {
 
     assert.equal(usage.success, true);
     assert.equal(usage.usageEventId.includes("tx_demo_001"), true);
+  });
+
+  test("syncs a successful Dodo checkout return before subscription webhook arrives", async () => {
+    await createCheckoutSession({
+      companyId: "company_demo_01",
+      tier: "Growth",
+      origin: "http://localhost:3000",
+    });
+
+    const reconciliation = await reconcileBillingState("company_demo_01", {
+      checkout: "growth",
+      session_id: "cks_growth_test",
+    });
+
+    assert.equal(reconciliation.status, "active");
+    assert.equal(reconciliation.planTier, "Growth");
+    assert.equal(reconciliation.paymentId, "pay_growth_test");
+    assert.equal(reconciliation.checkoutSessionId, "cks_growth_test");
   });
 
   test("rejects Dodo webhooks with an invalid signature", async () => {
@@ -112,7 +143,7 @@ describe("Dodo billing service", () => {
       companyId: "company_demo_01",
       customerId: "cus_123",
       subscriptionId: "sub_123",
-      status: "pending",
+      status: "active",
       plan: "growth",
       processed: true,
     });

@@ -212,6 +212,9 @@ type CompanyOverviewResponse = {
     webhookSync: "confirmed" | "stale" | "pending";
     latestEventAt?: string | null;
     latestPaymentId?: string | null;
+    portalUrl?: string | null;
+    subscriptionUpdatedAt?: string | null;
+    webhookLastReceivedAt?: string | null;
     recentEvents: Array<{
       id: string;
       dodoPaymentId: string;
@@ -286,6 +289,25 @@ type ValidationResponse = {
   artifactPath?: string;
   artifact?: unknown;
   error?: string;
+};
+
+type BillingReconcileResponse = {
+  status: string;
+  subscriptionId: string | null;
+  customerId: string | null;
+  paymentId?: string | null;
+  checkoutSessionId?: string | null;
+  planTier: string | null;
+  lastSyncAt?: string;
+  lastWebhookAt?: string | null;
+  lastWebhookProcessed?: string | null;
+  webhooksSyncedRecently: boolean;
+  latestPaymentStatus?: string | null;
+  latestPaymentAmount?: number | null;
+  latestPaymentCurrency?: string | null;
+  latestPaymentAt?: string | null;
+  discrepancies: string[];
+  nextSteps: string[];
 };
 
 function normalizeKycStatus(value?: string | null): Contractor["kycStatus"] {
@@ -429,7 +451,13 @@ export const api = {
     }
   },
   checkout: (tier: string) =>
-    fetchJson<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ tier }) }),
+    fetchJson<{ url: string; redirectUrl: string }>("/api/billing/create-checkout", { method: "POST", body: JSON.stringify({ selectedPlan: tier }) }),
+  reconcileBilling: (returnParams?: Record<string, string>) =>
+    fetchJson<BillingReconcileResponse>("/api/billing/reconcile", {
+      method: "POST",
+      body: JSON.stringify(returnParams ? { returnParams } : {}),
+    }),
+  createBillingPortal: () => fetchJson<{ url: string }>("/api/billing/create-portal", { method: "POST", body: JSON.stringify({}) }),
   fxRates: async () => {
     const response = await fetchJson<{
       base: string;

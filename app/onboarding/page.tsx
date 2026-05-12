@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Copy, ExternalLink, Landmark, RadioTower } from "lucide-react";
@@ -14,12 +14,13 @@ import { Progress } from "@/components/ui/progress";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuthSession } from "@/lib/auth/client";
+import { billingPlanList } from "@/lib/billing/plans";
 import { getSolanaAddressUrl } from "@/lib/solana/explorer";
 import { useAppStore } from "@/lib/store";
 import { formatUSDC, truncateHash } from "@/lib/utils";
 
 const STORAGE_KEY = "bp_onboarding_state_v1";
-const tiers = ["Starter", "Growth", "Enterprise"] as const;
+const tiers = billingPlanList;
 const totalSteps = 4;
 
 type OnboardingState = {
@@ -74,6 +75,9 @@ function OnboardingFlow() {
   const [hydrated, setHydrated] = useState(false);
   const [checkoutLoadingTier, setCheckoutLoadingTier] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const checkoutReturnToastShown = useRef(false);
+  const billingSyncedToastShown = useRef(false);
+  const billingFailureToastShown = useRef(false);
 
   useEffect(() => {
     const nextState = readStoredState();
@@ -98,8 +102,24 @@ function OnboardingFlow() {
     retry: 0,
   });
 
+  const reconcileQuery = useQuery({
+    queryKey: ["billing-reconcile", "onboarding", searchParams.toString()],
+    queryFn: () => api.reconcileBilling(Object.fromEntries(searchParams.entries())),
+    enabled: hydrated && auth.isAuthenticated && !auth.loading && searchParams.get("billing_return") === "1",
+    retry: 2,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "active" || status === "trialing" || status === "cancelled" || status === "failed" ? false : 5_000;
+    },
+  });
+
   const checkoutTier = searchParams.get("checkout");
   const checkoutProvider = searchParams.get("provider");
+  const billingReturn = searchParams.get("billing_return");
+  const billingStatus = overviewQuery.data?.billing.status;
+  const reconciledStatus = reconcileQuery.data?.status;
+  const reconciledPlanTier = reconcileQuery.data?.planTier;
+  const refetchOverview = overviewQuery.refetch;
 
   useEffect(() => {
     if (!hydrated || !checkoutTier || !checkoutProvider) {
@@ -107,18 +127,66 @@ function OnboardingFlow() {
     }
 
     const normalizedTier =
-      tiers.find((tier) => tier.toLowerCase() === checkoutTier.toLowerCase()) ?? state.selectedPlan;
-    setState((current) => ({
-      ...current,
-      selectedPlan: normalizedTier,
-      checkoutCompleted: true,
-      step: Math.max(current.step, 3),
-    }));
-    pushToast({
-      type: "success",
-      message: `${normalizedTier} billing checkout confirmed.`,
-    });
-  }, [checkoutProvider, checkoutTier, hydrated, pushToast, state.selectedPlan]);
+      tiers.find((tier) => tier.tier === checkoutTier.toLowerCase() || tier.displayName.toLowerCase() === checkoutTier.toLowerCase())?.displayName ?? state.selectedPlan;
+    setState((current) => (
+      current.selectedPlan === normalizedTier
+        ? current
+        : { ...current, selectedPlan: normalizedTier }
+    ));
+    if (!checkoutReturnToastShown.current) {
+      checkoutReturnToastShown.current = true;
+      pushToast({ type: "info", message: "Dodo checkout returned. Syncing subscription status." });
+    }
+  }, [checkoutProvider, checkoutTier, hydrated, pushToast]);
+
+  useEffect(() => {
+    if (!reconciledStatus) return;
+    if (reconciledStatus === "active" || reconciledStatus === "trialing") {
+      setState((current) => {
+        const selectedPlan = reconciledPlanTier ?? current.selectedPlan;
+        const step = Math.max(current.step, 3);
+        if (current.selectedPlan === selectedPlan && current.checkoutCompleted && current.step === step) {
+          return current;
+        }
+        return {
+          ...current,
+          selectedPlan,
+          checkoutCompleted: true,
+          step,
+        };
+      });
+      if (!billingSyncedToastShown.current) {
+        billingSyncedToastShown.current = true;
+        refetchOverview();
+        pushToast({ type: "success", message: "Dodo subscription synced." });
+      }
+    } else if (reconciledStatus === "failed" || reconciledStatus === "cancelled") {
+      setState((current) => (
+        current.checkoutCompleted ? { ...current, checkoutCompleted: false } : current
+      ));
+      if (!billingFailureToastShown.current) {
+        billingFailureToastShown.current = true;
+        pushToast({ type: "error", message: `Billing status is ${reconciledStatus}.` });
+      }
+    }
+  }, [reconciledStatus, reconciledPlanTier, refetchOverview, pushToast]);
+
+  useEffect(() => {
+    if (!billingStatus || billingReturn === "1") return;
+
+    if (billingStatus === "active" || billingStatus === "trialing") {
+      setState((current) => (
+        current.checkoutCompleted ? current : { ...current, checkoutCompleted: true }
+      ));
+      return;
+    }
+
+    setState((current) => (
+      current.checkoutCompleted
+        ? { ...current, checkoutCompleted: false }
+        : current
+    ));
+  }, [billingStatus, billingReturn]);
 
   const treasuryWallet =
     overviewQuery.data?.company.treasuryWalletAddress ??
@@ -146,7 +214,7 @@ function OnboardingFlow() {
 
     try {
       setCheckoutLoadingTier(tier);
-      setState((current) => ({ ...current, selectedPlan: tier }));
+      setState((current) => ({ ...current, selectedPlan: tier, checkoutCompleted: false }));
       const result = await api.checkout(tier);
       pushToast({ type: "info", message: `Redirecting to ${tier} checkout.` });
       window.location.href = result.url;
@@ -261,7 +329,8 @@ function OnboardingFlow() {
         {state.step === 2 && (
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-3">
-              {tiers.map((tier) => {
+              {tiers.map((plan) => {
+                const tier = plan.displayName;
                 const selected = state.selectedPlan === tier;
                 const loading = checkoutLoadingTier === tier;
                 return (
@@ -279,16 +348,16 @@ function OnboardingFlow() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-semibold">{tier}</h3>
-                        <p className="mt-2 text-sm text-zinc-400">Powered by Dodo Payments</p>
+                        <p className="mt-2 text-sm text-zinc-400">{plan.monthlyLabel} - {plan.uiLabel}</p>
                       </div>
                       {selected && state.checkoutCompleted ? (
                         <CheckCircle2 className="h-5 w-5 text-emerald-300" />
                       ) : null}
                     </div>
                     <ul className="mt-5 space-y-2 text-sm text-zinc-300">
-                      <li>Hosted checkout</li>
-                      <li>Subscription webhooks</li>
-                      <li>Usage reporting</li>
+                      {plan.features.slice(0, 3).map((feature) => (
+                        <li key={feature}>{feature}</li>
+                      ))}
                     </ul>
                     <p className="mt-5 text-xs text-violet-300">
                       {loading
@@ -304,7 +373,9 @@ function OnboardingFlow() {
             <div className="rounded-lg border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-zinc-400">
               {state.checkoutCompleted
                 ? `Billing activated on ${state.selectedPlan}. Continue to treasury funding.`
-                : "Select a plan to launch the hosted Dodo checkout. After returning, this step unlocks automatically."}
+                : reconcileQuery.isFetching
+                  ? "Syncing Dodo subscription state..."
+                  : "Select a plan to launch the hosted Dodo checkout. After returning, this step unlocks automatically."}
             </div>
           </div>
         )}

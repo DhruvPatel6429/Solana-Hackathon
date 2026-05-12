@@ -1,4 +1,25 @@
-node_modules
+node_modules/
 .env
-.next
-programs\escrow\target\sbpf-solana-solana\release\deps
+.env.local
+.env*.local
+.next/
+out/
+
+# TypeScript / Next build metadata
+*.tsbuildinfo
+next-env.d.ts
+
+# Rust / Anchor build outputs
+target/
+programs/**/target/
+.anchor/
+**/.cargo-artifact-lock
+**/.cargo-build-lock
+**/.cargo-lock
+
+# Local runtime logs and scratch output
+*.log
+artifacts/*.log
+artifacts/*.json
+~/
+~/.config/

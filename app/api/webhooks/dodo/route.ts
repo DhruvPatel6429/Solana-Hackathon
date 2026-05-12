@@ -5,8 +5,10 @@ export async function POST(request: Request) {
   const { webhookRecoveryService } = await import("@/lib/services/webhook-recovery.service");
   const requestId = getRequestId(request);
   const payload = await request.text();
-  const signature = request.headers.get("dodo-signature");
-  const externalId = request.headers.get("dodo-event-id") ?? undefined;
+  const signature = request.headers.get("webhook-signature") ?? request.headers.get("dodo-signature");
+  const webhookId = request.headers.get("webhook-id") ?? request.headers.get("dodo-event-id");
+  const webhookTimestamp = request.headers.get("webhook-timestamp") ?? request.headers.get("dodo-timestamp");
+  const externalId = webhookId ?? undefined;
   const safePayload = () => {
     try {
       return JSON.parse(payload || "{}");
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
 
   try {
     const freshness = assertWebhookFreshness(request);
-    const accountUpdate = await handleDodoWebhook({ payload, signature });
+    const accountUpdate = await handleDodoWebhook({ payload, signature, webhookId, webhookTimestamp });
     logger.info("Dodo webhook processed", {
       requestId,
       webhookId: accountUpdate.eventId,

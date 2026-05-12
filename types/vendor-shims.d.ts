@@ -6,6 +6,7 @@ declare module "lucide-react" {
   >;
 
   export const Activity: LucideIcon;
+  export const AlertCircle: LucideIcon;
   export const ArrowRight: LucideIcon;
   export const BadgeCheck: LucideIcon;
   export const BadgeDollarSign: LucideIcon;
@@ -29,6 +30,7 @@ declare module "lucide-react" {
   export const LayoutDashboard: LucideIcon;
   export const LockKeyhole: LucideIcon;
   export const LogOut: LucideIcon;
+  export const Loader: LucideIcon;
   export const Menu: LucideIcon;
   export const Play: LucideIcon;
   export const Plus: LucideIcon;

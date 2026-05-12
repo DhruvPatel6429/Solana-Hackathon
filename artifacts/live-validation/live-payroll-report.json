@@ -1,6 +1,6 @@
 {
   "name": "run-live-payroll-flow",
-  "generatedAt": "2026-05-11T19:04:56.230Z",
+  "generatedAt": "2026-05-12T11:48:15.685Z",
   "environment": {
     "network": "devnet",
     "rpcUrl": "https://api.devnet.solana.com"
@@ -9,31 +9,31 @@
     {
       "name": "Create test company + contractor + invoice",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:06.551Z",
-      "endedAt": "2026-05-11T19:04:08.695Z",
-      "durationMs": 2144,
+      "startedAt": "2026-05-12T11:47:24.536Z",
+      "endedAt": "2026-05-12T11:47:27.158Z",
+      "durationMs": 2622,
       "details": {
-        "companyId": "company_live_1778526246551_a0e104",
-        "contractorId": "contractor_live_1778526246551_a0e104",
-        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "companyId": "company_live_1778586444536_633c40",
+        "contractorId": "contractor_live_1778586444536_633c40",
+        "invoiceId": "cmp2kg57n0000lkuaoq1owy09",
         "invoiceAmountUsdc": 0.05
       }
     },
     {
       "name": "Snapshot balances before payout",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:08.695Z",
-      "endedAt": "2026-05-11T19:04:09.071Z",
-      "durationMs": 376,
+      "startedAt": "2026-05-12T11:47:27.158Z",
+      "endedAt": "2026-05-12T11:47:27.720Z",
+      "durationMs": 562,
       "details": {
         "contractorBefore": {
-          "amount": "1550000",
-          "uiAmount": 1.55,
+          "amount": "1825000",
+          "uiAmount": 1.825,
           "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
         },
         "treasuryBefore": {
-          "amount": "1998045000",
-          "uiAmount": 1998.045,
+          "amount": "1892565000",
+          "uiAmount": 1892.565,
           "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
         }
       }
@@ -41,78 +41,78 @@
     {
       "name": "Initialize escrow",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:09.071Z",
-      "endedAt": "2026-05-11T19:04:22.223Z",
-      "durationMs": 13152,
+      "startedAt": "2026-05-12T11:47:27.720Z",
+      "endedAt": "2026-05-12T11:47:41.305Z",
+      "durationMs": 13585,
       "details": {
-        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
-        "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP",
-        "vault": "C1hyRFk7Y1AXRM3Y3bm1AM4mUAizmnvsQ41NdUv2t8c6",
-        "signature": "2XzTafa6HmnmUXYgWCMMAYPJ9EdHQaREta9VVjpBiXKP1foArkd7FsSeHaJ1ZiDqPrgaqh6nBf7zcQeL2H8Cwsux"
+        "invoiceId": "cmp2kg57n0000lkuaoq1owy09",
+        "escrowPda": "7Fp5TdySEWYdoqNLddpwUepgh6YGdGy3a9sfvVE3F99B",
+        "vault": "FzdyLwWuNs9XJ6r4KQmLpQg3LvkkkJ7DJSMX47751hQo",
+        "signature": "5hPesv7niH2ymL2FiRL7fjWBvztCTt7gWiXoJ2rMdjKA7onLYwqxZnaW6rZhDThJaeAxPBCZHfa9DfTXAW2pMenv"
       }
     },
     {
       "name": "Deposit devnet USDC to escrow",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:22.224Z",
-      "endedAt": "2026-05-11T19:04:35.755Z",
-      "durationMs": 13531,
+      "startedAt": "2026-05-12T11:47:41.305Z",
+      "endedAt": "2026-05-12T11:47:55.035Z",
+      "durationMs": 13730,
       "details": {
-        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
-        "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP",
-        "signature": "MAm74QADMRicchAgGRmDQ5kEUC6dGuyc5LAy1oRFsZb16ExGinp4QCMejqnuB5kqtregWEtcpzcDVhkkDFjygui",
+        "invoiceId": "cmp2kg57n0000lkuaoq1owy09",
+        "escrowPda": "7Fp5TdySEWYdoqNLddpwUepgh6YGdGy3a9sfvVE3F99B",
+        "signature": "53C424Ua3hhiAsmpGnYRwtysAKMv2of7E81d1nM32JdcqcPkw131mNERRvMmvwAuQYxvj81cTnNgus8ZnaRnNMdz",
         "amountBaseUnits": "50000"
       }
     },
     {
       "name": "Approve invoice",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:35.755Z",
-      "endedAt": "2026-05-11T19:04:38.074Z",
-      "durationMs": 2319,
+      "startedAt": "2026-05-12T11:47:55.035Z",
+      "endedAt": "2026-05-12T11:47:56.923Z",
+      "durationMs": 1888,
       "details": {
-        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "invoiceId": "cmp2kg57n0000lkuaoq1owy09",
         "status": "APPROVED",
-        "approvedAt": "2026-05-11T19:04:36.847Z"
+        "approvedAt": "2026-05-12T11:47:55.921Z"
       }
     },
     {
       "name": "Release escrow via payout execution",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:38.074Z",
-      "endedAt": "2026-05-11T19:04:53.928Z",
-      "durationMs": 15854,
+      "startedAt": "2026-05-12T11:47:56.923Z",
+      "endedAt": "2026-05-12T11:48:13.089Z",
+      "durationMs": 16166,
       "details": {
-        "payoutId": "cmp1kmjhb0002h4uahweco8ej",
-        "payoutSignature": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7",
-        "explorerUrl": "https://explorer.solana.com/tx/2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7?cluster=devnet"
+        "payoutId": "cmp2kgt2l0002lkua8zpelf8j",
+        "payoutSignature": "53R2XVBB5os3XJ8S2foSTErmiKaiFDhjWTu4qTfvocYFkq2vYgrqt3ceU3hgg4diBKDCg4ANQw8f6hXWJ3dfrECq",
+        "explorerUrl": "https://explorer.solana.com/tx/53R2XVBB5os3XJ8S2foSTErmiKaiFDhjWTu4qTfvocYFkq2vYgrqt3ceU3hgg4diBKDCg4ANQw8f6hXWJ3dfrECq?cluster=devnet"
       }
     },
     {
       "name": "Verify contractor balance delta",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:53.928Z",
-      "endedAt": "2026-05-11T19:04:54.151Z",
-      "durationMs": 223,
+      "startedAt": "2026-05-12T11:48:13.089Z",
+      "endedAt": "2026-05-12T11:48:13.287Z",
+      "durationMs": 198,
       "details": {
         "contractorBefore": {
-          "amount": "1550000",
-          "uiAmount": 1.55,
+          "amount": "1825000",
+          "uiAmount": 1.825,
           "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
         },
         "contractorAfter": {
-          "amount": "1600000",
-          "uiAmount": 1.6,
+          "amount": "1875000",
+          "uiAmount": 1.875,
           "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
         },
         "treasuryBefore": {
-          "amount": "1998045000",
-          "uiAmount": 1998.045,
+          "amount": "1892565000",
+          "uiAmount": 1892.565,
           "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
         },
         "treasuryAfter": {
-          "amount": "1997995000",
-          "uiAmount": 1997.995,
+          "amount": "1892515000",
+          "uiAmount": 1892.515,
           "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
         }
       }
@@ -120,23 +120,23 @@
     {
       "name": "Verify DB persistence + explorer transaction",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:54.151Z",
-      "endedAt": "2026-05-11T19:04:54.978Z",
-      "durationMs": 827,
+      "startedAt": "2026-05-12T11:48:13.287Z",
+      "endedAt": "2026-05-12T11:48:14.160Z",
+      "durationMs": 873,
       "details": {
         "invoiceStatus": "PAID",
         "payoutStatus": "CONFIRMED",
-        "payoutId": "cmp1kmjhb0002h4uahweco8ej",
-        "payoutSignature": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7",
-        "explorerUrl": "https://explorer.solana.com/tx/2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7?cluster=devnet"
+        "payoutId": "cmp2kgt2l0002lkua8zpelf8j",
+        "payoutSignature": "53R2XVBB5os3XJ8S2foSTErmiKaiFDhjWTu4qTfvocYFkq2vYgrqt3ceU3hgg4diBKDCg4ANQw8f6hXWJ3dfrECq",
+        "explorerUrl": "https://explorer.solana.com/tx/53R2XVBB5os3XJ8S2foSTErmiKaiFDhjWTu4qTfvocYFkq2vYgrqt3ceU3hgg4diBKDCg4ANQw8f6hXWJ3dfrECq?cluster=devnet"
       }
     },
     {
       "name": "Verify dashboard state (metrics + reconciliation)",
       "status": "PASS",
-      "startedAt": "2026-05-11T19:04:54.978Z",
-      "endedAt": "2026-05-11T19:04:56.069Z",
-      "durationMs": 1091,
+      "startedAt": "2026-05-12T11:48:14.160Z",
+      "endedAt": "2026-05-12T11:48:15.523Z",
+      "durationMs": 1363,
       "details": {
         "metrics": {
           "payouts": {
@@ -150,8 +150,8 @@
             "totalBalanceUsdc": 0,
             "wallets": [
               {
-                "companyId": "company_live_1778526246551_a0e104",
-                "companyName": "Phase4 Company live_1778526246551_a0e104",
+                "companyId": "company_live_1778586444536_633c40",
+                "companyName": "Phase4 Company live_1778586444536_633c40",
                 "walletAddress": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
                 "balanceUsdc": 0,
                 "updatedAt": null
@@ -163,7 +163,7 @@
           "open": 0,
           "critical": 0,
           "failedJobs": 0,
-          "deadLetterWebhooks": 10
+          "deadLetterWebhooks": 25
         }
       }
     }
@@ -172,15 +172,15 @@
     "passed": 9,
     "failed": 0
   },
-  "runId": "live_1778526246551_a0e104",
-  "companyId": "company_live_1778526246551_a0e104",
-  "contractorId": "contractor_live_1778526246551_a0e104",
-  "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
-  "payoutId": "cmp1kmjhb0002h4uahweco8ej",
+  "runId": "live_1778586444536_633c40",
+  "companyId": "company_live_1778586444536_633c40",
+  "contractorId": "contractor_live_1778586444536_633c40",
+  "invoiceId": "cmp2kg57n0000lkuaoq1owy09",
+  "payoutId": "cmp2kgt2l0002lkua8zpelf8j",
   "signatures": {
-    "initialize": "2XzTafa6HmnmUXYgWCMMAYPJ9EdHQaREta9VVjpBiXKP1foArkd7FsSeHaJ1ZiDqPrgaqh6nBf7zcQeL2H8Cwsux",
-    "deposit": "MAm74QADMRicchAgGRmDQ5kEUC6dGuyc5LAy1oRFsZb16ExGinp4QCMejqnuB5kqtregWEtcpzcDVhkkDFjygui",
-    "release": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7"
+    "initialize": "5hPesv7niH2ymL2FiRL7fjWBvztCTt7gWiXoJ2rMdjKA7onLYwqxZnaW6rZhDThJaeAxPBCZHfa9DfTXAW2pMenv",
+    "deposit": "53C424Ua3hhiAsmpGnYRwtysAKMv2of7E81d1nM32JdcqcPkw131mNERRvMmvwAuQYxvj81cTnNgus8ZnaRnNMdz",
+    "release": "53R2XVBB5os3XJ8S2foSTErmiKaiFDhjWTu4qTfvocYFkq2vYgrqt3ceU3hgg4diBKDCg4ANQw8f6hXWJ3dfrECq"
   },
-  "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP"
+  "escrowPda": "7Fp5TdySEWYdoqNLddpwUepgh6YGdGy3a9sfvVE3F99B"
 }

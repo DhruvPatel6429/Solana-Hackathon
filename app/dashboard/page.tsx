@@ -21,7 +21,9 @@ import {
 
 import { FadeIn } from "@/components/animated";
 import { AdminAuthCard } from "@/components/admin-auth-card";
+import { DodoDiagnosticsPanel } from "@/components/admin/dodo-diagnostics-panel";
 import { AppShell } from "@/components/app-shell";
+import { BillingIntegrationStatus } from "@/components/billing-integration-status";
 import { EmptyState } from "@/components/empty-state";
 import { Sparkline } from "@/components/charts";
 import { Skeleton } from "@/components/skeleton";
@@ -162,6 +164,18 @@ export default function DashboardPage() {
       });
     },
   });
+  const createPortal = useMutation({
+    mutationFn: api.createBillingPortal,
+    onSuccess: (result) => {
+      window.location.href = result.url;
+    },
+    onError: (error) => {
+      pushToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "Unable to open billing portal.",
+      });
+    },
+  });
 
   const filteredContractors = contractors.filter((contractor) => {
     const matchesSearch = contractor.name.toLowerCase().includes(search.toLowerCase());
@@ -293,6 +307,10 @@ export default function DashboardPage() {
                   <RadioTower className="h-4 w-4" />
                   Refresh
                 </Button>
+                <Button variant="secondary" onClick={() => createPortal.mutate()} disabled={createPortal.isPending || !overview.data?.billing.customerId}>
+                  <ExternalLink className="h-4 w-4" />
+                  {createPortal.isPending ? "Opening..." : "Manage Subscription"}
+                </Button>
                 <Button onClick={() => setTopUpOpen(true)}>Top Up Treasury</Button>
               </div>
             </div>
@@ -360,6 +378,13 @@ export default function DashboardPage() {
               queryClient.invalidateQueries();
             }}
           />
+        ) : null}
+
+        {auth.isAuthenticated ? (
+          <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+            <BillingIntegrationStatus />
+            <DodoDiagnosticsPanel />
+          </div>
         ) : null}
 
         {auth.isAuthenticated && (contractorsError || invoicesError || overview.error) && (
