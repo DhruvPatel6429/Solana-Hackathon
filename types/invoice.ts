@@ -7,6 +7,7 @@ export type Invoice = {
   amount: number;
   currency: "USDC";
   submittedAt: string;
+  approvedAt?: string;
   status: InvoiceStatus;
   txHash?: string;
   description: string;

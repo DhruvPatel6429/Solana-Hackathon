@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-05-12T08:39:55.011Z",
+  "runId": "tenant_1778575192236_1d24bc",
+  "organizationId": "org_tenant_1778575192236_1d24bc",
+  "checks": {
+    "companyAInvoiceCount": 1,
+    "companyBInvoiceCount": 1,
+    "companyAPayoutCount": 1,
+    "companyBPayoutCount": 1,
+    "leakage": {
+      "invoiceLeakage": false,
+      "payoutLeakage": false
+    }
+  },
+  "passed": true
+}

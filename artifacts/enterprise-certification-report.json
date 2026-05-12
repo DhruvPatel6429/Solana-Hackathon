@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-05-12T08:40:05.193Z",
+  "summary": {
+    "passed": 11,
+    "failed": 0
+  },
+  "score": {
+    "technical": {
+      "passed": 8,
+      "total": 8
+    },
+    "commercial": {
+      "passed": 3,
+      "total": 3
+    }
+  },
+  "checks": [
+    {
+      "name": "build",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "npm run build passed"
+    },
+    {
+      "name": "tests",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "npm test passed"
+    },
+    {
+      "name": "typecheck",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "npm run typecheck passed"
+    },
+    {
+      "name": "wallet_and_solana_env",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "Solana environment variables present"
+    },
+    {
+      "name": "db_and_webhook_env",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "Database and webhook secrets present"
+    },
+    {
+      "name": "scaling_script",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "load-test-platform script exists"
+    },
+    {
+      "name": "tenant_isolation_validation",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "Tenant isolation verification passed"
+    },
+    {
+      "name": "recovery_scripts",
+      "category": "technical",
+      "status": "PASS",
+      "detail": "Recovery scripts exist"
+    },
+    {
+      "name": "tenancy_and_partner_apis",
+      "category": "commercial",
+      "status": "PASS",
+      "detail": "Tenant and partner APIs implemented"
+    },
+    {
+      "name": "documentation_package",
+      "category": "commercial",
+      "status": "PASS",
+      "detail": "Commercial and governance documentation present"
+    },
+    {
+      "name": "api_surface_runtime_smoke",
+      "category": "commercial",
+      "status": "PASS",
+      "detail": "Skipped runtime API smoke (APP_BASE_URL or ADMIN_BEARER_TOKEN not set)"
+    }
+  ],
+  "finalEnterpriseScore": 100
+}

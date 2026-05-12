@@ -10,6 +10,7 @@ type TestDb = {
   contractor: TestTable;
   invoice: TestTable;
   payout: TestTable;
+  usageEvent: TestTable;
   auditLog: TestTable;
   webhookEvent: TestTable;
   billingEvent: TestTable;
@@ -34,6 +35,7 @@ function createDb(): TestDb {
     contractor: { rows: [] },
     invoice: { rows: [] },
     payout: { rows: [] },
+    usageEvent: { rows: [] },
     auditLog: { rows: [] },
     webhookEvent: { rows: [] },
     billingEvent: { rows: [] },
@@ -239,6 +241,7 @@ export async function installPrismaTestDb(): Promise<{
       id: data.id ?? id("company_user"),
       companyId: data.companyId,
       userId: data.userId,
+      role: data.role ?? "admin",
       createdAt: data.createdAt ?? now(),
     };
     db.companyUser.rows.push(row);
@@ -393,6 +396,19 @@ export async function installPrismaTestDb(): Promise<{
   replace(prisma.payout, "findFirst", async ({ where, select }: any = {}) => {
     const row = db.payout.rows.find((candidate) => matchesWhere(candidate, where));
     return row ? applySelect(row, select) : null;
+  });
+
+  replace(prisma.usageEvent, "create", async ({ data }: any) => {
+    const row = {
+      id: data.id ?? id("usage_event"),
+      organizationId: data.organizationId ?? null,
+      companyId: data.companyId,
+      eventType: data.eventType,
+      dodoEventId: data.dodoEventId ?? null,
+      reportedAt: data.reportedAt ?? now(),
+    };
+    db.usageEvent.rows.push(row);
+    return { ...row };
   });
 
   replace(prisma.auditLog, "create", async ({ data }: any) => {

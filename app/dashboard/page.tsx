@@ -24,7 +24,6 @@ import { AdminAuthCard } from "@/components/admin-auth-card";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { Sparkline } from "@/components/charts";
-import { JudgeDemoPanel } from "@/components/judge-demo-panel";
 import { Skeleton } from "@/components/skeleton";
 import { WalletConnect } from "@/components/wallet-connect";
 import { Avatar } from "@/components/ui/avatar";
@@ -321,45 +320,38 @@ export default function DashboardPage() {
         </FadeIn>
 
         <FadeIn delay={0.03}>
-          <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-            <Card className="shine h-full">
-              <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
-                <div>
-                  <p className="metric-label">Demo moment for judges</p>
-                  <h2 className="mt-2 text-2xl font-bold">Execute a multi-recipient payroll batch and verify the proof immediately.</h2>
-                  <p className="mt-3 text-sm leading-6 text-zinc-400">
-                    The UI now connects plan state, treasury funding, invoice approval, Solana settlement, and webhook sync in one workflow.
-                  </p>
+          <Card>
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+              <div>
+                <p className="metric-label">Integration stack</p>
+                <h2 className="mt-2 text-2xl font-bold">Live payroll infrastructure status</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+                  Track billing, treasury sync, and Solana availability before moving approved invoices into settlement.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => queryClient.invalidateQueries()}
+                aria-label="Refresh integration status"
+              >
+                <RadioTower className="h-4 w-4" />
+                Refresh status
+              </Button>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                ["Dodo checkout", billingStatus],
+                ["Helius treasury monitor", overview.data?.treasury.webhookSync ?? "pending"],
+                ["Solana devnet", treasuryData?.source === "solana" ? "connected" : "syncing"],
+              ].map(([label, status]) => (
+                <div key={label} className="group flex items-center justify-between rounded-lg border border-white/10 bg-zinc-900 px-4 py-3 transition duration-200 hover:-translate-y-0.5 hover:border-violet-400/30 hover:bg-white/[0.045]">
+                  <span className="text-sm text-zinc-300">{label}</span>
+                  <Badge tone="emerald" className="capitalize">{status}</Badge>
                 </div>
-                <Button
-                  onClick={() => executePayouts.mutate(payoutInvoiceIds)}
-                  disabled={executePayouts.isPending || payoutInvoiceIds.length === 0}
-                >
-                  <Zap className="h-4 w-4" />
-                  Run judge demo
-                </Button>
-              </div>
-            </Card>
-
-            <Card>
-              <p className="metric-label">Integration stack</p>
-              <div className="mt-4 space-y-3">
-                {[
-                  ["Dodo checkout", billingStatus],
-                  ["Helius treasury monitor", overview.data?.treasury.webhookSync ?? "pending"],
-                  ["Solana devnet", treasuryData?.source === "solana" ? "connected" : "syncing"],
-                ].map(([label, status]) => (
-                  <div key={label} className="flex items-center justify-between rounded-lg border border-white/10 bg-zinc-900 px-3 py-2">
-                    <span className="text-sm text-zinc-300">{label}</span>
-                    <Badge tone="emerald" className="capitalize">{status}</Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+              ))}
+            </div>
+          </Card>
         </FadeIn>
-
-        <JudgeDemoPanel />
 
         {!auth.loading && !auth.isAuthenticated ? (
           <AdminAuthCard

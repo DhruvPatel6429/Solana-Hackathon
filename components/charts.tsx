@@ -18,6 +18,13 @@ import {
 } from "recharts";
 
 const tooltip = { backgroundColor: "#111118", border: "1px solid #1E1E2E", color: "#fff" };
+const axisTick = { fontSize: 12, fill: "#a1a1aa" };
+
+function formatCurrency(value: number) {
+  return `$${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(value)}`;
+}
 
 export type ChartDatum = {
   label: string;
@@ -47,12 +54,26 @@ export function Sparkline({ values }: { values?: number[] }) {
 export function ContractorSpendChart({ data }: { data: ChartDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height={310}>
-      <BarChart data={data}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="#1E1E2E" vertical={false} />
-        <XAxis dataKey="label" stroke="#71717a" />
-        <YAxis stroke="#71717a" />
-        <Tooltip contentStyle={tooltip} />
+        <XAxis dataKey="label" stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+        <Tooltip contentStyle={tooltip} cursor={{ fill: "rgba(124, 58, 237, 0.08)" }} formatter={(value) => formatCurrency(Number(value))} />
         <Bar dataKey="value" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function DailyPayrollSpendChart({ data }: { data: ChartDatum[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={270}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke="#1E1E2E" vertical={false} />
+        <XAxis dataKey="label" stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+        <Tooltip contentStyle={tooltip} cursor={{ fill: "rgba(16, 185, 129, 0.08)" }} formatter={(value) => formatCurrency(Number(value))} />
+        <Bar dataKey="value" fill="#10B981" radius={[5, 5, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -72,7 +93,7 @@ export function CurrencyDonutChart({ data }: { data: DonutDatum[] }) {
             <Cell key={entry.name} fill={colors[index]} />
           ))}
         </Pie>
-        <Tooltip contentStyle={tooltip} />
+        <Tooltip contentStyle={tooltip} formatter={(value) => formatCurrency(Number(value))} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -81,10 +102,10 @@ export function CurrencyDonutChart({ data }: { data: DonutDatum[] }) {
 export function ApprovalLineChart({ data }: { data: ChartDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <LineChart data={data}>
+      <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="#1E1E2E" vertical={false} />
-        <XAxis dataKey="label" stroke="#71717a" />
-        <YAxis stroke="#71717a" />
+        <XAxis dataKey="label" stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
         <Tooltip contentStyle={tooltip} />
         <Line dataKey="value" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981" }} />
       </LineChart>
@@ -95,7 +116,7 @@ export function ApprovalLineChart({ data }: { data: ChartDatum[] }) {
 export function TreasuryAreaChart({ data }: { data: ChartDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={data}>
+      <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="violetFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.55} />
@@ -103,9 +124,9 @@ export function TreasuryAreaChart({ data }: { data: ChartDatum[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid stroke="#1E1E2E" vertical={false} />
-        <XAxis dataKey="label" stroke="#71717a" />
-        <YAxis stroke="#71717a" />
-        <Tooltip contentStyle={tooltip} />
+        <XAxis dataKey="label" stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+        <Tooltip contentStyle={tooltip} formatter={(value) => formatCurrency(Number(value))} />
         <Area dataKey="value" stroke="#7C3AED" fill="url(#violetFill)" strokeWidth={3} />
       </AreaChart>
     </ResponsiveContainer>
@@ -115,11 +136,11 @@ export function TreasuryAreaChart({ data }: { data: ChartDatum[] }) {
 export function PaymentHistoryChart({ data }: { data: ChartDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="#1E1E2E" vertical={false} />
-        <XAxis dataKey="label" stroke="#71717a" />
-        <YAxis stroke="#71717a" />
-        <Tooltip contentStyle={tooltip} />
+        <XAxis dataKey="label" stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} />
+        <YAxis stroke="#71717a" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+        <Tooltip contentStyle={tooltip} cursor={{ fill: "rgba(124, 58, 237, 0.08)" }} formatter={(value) => formatCurrency(Number(value))} />
         <Bar dataKey="value" fill="#7C3AED" radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>

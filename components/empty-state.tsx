@@ -2,8 +2,8 @@ import { FileSearch } from "lucide-react";
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="grid place-items-center rounded-lg border border-dashed border-white/10 bg-zinc-900 p-10 text-center">
-      <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-violet-500/10 text-violet-200">
+    <div className="grid place-items-center rounded-lg border border-dashed border-white/10 bg-zinc-900 p-10 text-center transition duration-200 hover:border-violet-400/30 hover:bg-zinc-900/80">
+      <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-violet-500/10 text-violet-200 transition duration-200">
         <FileSearch className="h-8 w-8" />
       </div>
       <h3 className="font-semibold text-white">{title}</h3>
