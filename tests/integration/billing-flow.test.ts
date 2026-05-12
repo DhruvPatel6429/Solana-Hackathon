@@ -8,11 +8,53 @@ import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+const originalFetch = globalThis.fetch;
 let restoreDb: (() => void) | undefined;
 
 beforeEach(async () => {
+  process.env.DODO_API_KEY = "dodo_test_api_key";
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/v1/checkout/sessions")) {
+      return new Response(
+        JSON.stringify({
+          checkoutUrl: "https://billing.example/checkout?checkout=growth",
+          customerId: "dodo_cus_demo_growth",
+          subscriptionId: "dodo_sub_demo_growth",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    if (url.includes("/v1/usage/events")) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          usageEventId: "usage_INV-1001",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    return new Response(JSON.stringify({ error: "not mocked" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+
   const installed = await installPrismaTestDb();
   restoreDb = installed.restore;
+  await installed.prisma.company.create({
+    data: { id: "company_demo_01", name: "Demo Billing Co" },
+  });
+  await installed.prisma.companyUser.create({
+    data: {
+      id: "membership_demo_01",
+      companyId: "company_demo_01",
+      userId: "test-admin",
+      role: "admin",
+    },
+  });
 });
 
 afterEach(() => {
@@ -20,14 +62,18 @@ afterEach(() => {
   restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
+  globalThis.fetch = originalFetch;
 });
 
 describe("Member 1 Dodo billing API flow", () => {
   test("checkout route returns a hosted checkout URL for company onboarding", async () => {
-    delete process.env.DODO_API_KEY;
     const request = new Request("http://localhost:3000/api/billing/checkout", {
       method: "POST",
-      headers: { "Content-Type": "application/json", origin: "http://localhost:3000" },
+      headers: {
+        "Content-Type": "application/json",
+        origin: "http://localhost:3000",
+        authorization: "Bearer test:test-admin",
+      },
       body: JSON.stringify({ companyId: "company_demo_01", tier: "Growth" }),
     });
 
@@ -41,10 +87,12 @@ describe("Member 1 Dodo billing API flow", () => {
   });
 
   test("usage route records one billable unit after payout or invoice events", async () => {
-    delete process.env.DODO_API_KEY;
     const request = new Request("http://localhost:3000/api/billing/report-usage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        authorization: "Bearer test:test-admin",
+      },
       body: JSON.stringify({ companyId: "company_demo_01", eventType: "invoice", referenceId: "INV-1001" }),
     });
 

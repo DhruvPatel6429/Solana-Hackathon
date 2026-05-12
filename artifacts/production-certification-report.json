@@ -1,0 +1,120 @@
+{
+  "name": "production-certification",
+  "generatedAt": "2026-05-12T08:43:27.600Z",
+  "summary": {
+    "passed": 6,
+    "failed": 6
+  },
+  "subsystems": [
+    {
+      "subsystem": "env_validation",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:41:58.392Z",
+      "endedAt": "2026-05-12T08:41:58.393Z",
+      "durationMs": 2,
+      "details": {
+        "requiredVarsValidated": 9
+      }
+    },
+    {
+      "subsystem": "typecheck",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:41:58.393Z",
+      "endedAt": "2026-05-12T08:42:05.235Z",
+      "durationMs": 6842,
+      "details": {
+        "command": "npm run typecheck"
+      }
+    },
+    {
+      "subsystem": "build",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:42:05.235Z",
+      "endedAt": "2026-05-12T08:42:38.492Z",
+      "durationMs": 33257,
+      "details": {
+        "command": "npm run build"
+      }
+    },
+    {
+      "subsystem": "migrations",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:42:38.492Z",
+      "endedAt": "2026-05-12T08:42:43.244Z",
+      "durationMs": 4752,
+      "error": "migrate status failed (exit 1)\nLoaded Prisma config from prisma.config.ts.\n\nPrisma schema loaded from prisma\\schema.prisma.\nError: Schema engine error:\n\n"
+    },
+    {
+      "subsystem": "docker_build",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:42:43.244Z",
+      "endedAt": "2026-05-12T08:42:44.308Z",
+      "durationMs": 1064,
+      "error": "docker build failed (exit 1)\nERROR: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.\n"
+    },
+    {
+      "subsystem": "anchor_build",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:42:44.308Z",
+      "endedAt": "2026-05-12T08:42:45.183Z",
+      "durationMs": 875,
+      "error": "anchor build failed (exit 1)\n'anchor' is not recognized as an internal or external command,\r\noperable program or batch file.\r\n"
+    },
+    {
+      "subsystem": "db_connectivity",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:42:45.183Z",
+      "endedAt": "2026-05-12T08:42:45.955Z",
+      "durationMs": 772,
+      "details": {
+        "database": "reachable"
+      }
+    },
+    {
+      "subsystem": "solana_connectivity",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:42:45.955Z",
+      "endedAt": "2026-05-12T08:42:46.177Z",
+      "durationMs": 222,
+      "details": {
+        "blockhash": "CLwhgRRXfe2mWjLJNGY18bNtYtrwnk7MWd3UGuC3nyPP",
+        "lastValidBlockHeight": 449676901
+      }
+    },
+    {
+      "subsystem": "api_health",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:42:46.177Z",
+      "endedAt": "2026-05-12T08:43:06.185Z",
+      "durationMs": 20008,
+      "error": "This operation was aborted"
+    },
+    {
+      "subsystem": "operational_endpoints",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:43:06.185Z",
+      "endedAt": "2026-05-12T08:43:06.185Z",
+      "durationMs": 0,
+      "error": "[phase4] Missing required env var: ADMIN_BEARER_TOKEN"
+    },
+    {
+      "subsystem": "logging_pipeline",
+      "status": "PASS",
+      "startedAt": "2026-05-12T08:43:06.185Z",
+      "endedAt": "2026-05-12T08:43:07.587Z",
+      "durationMs": 1402,
+      "details": {
+        "auditLogId": "cmp2dv3r3000010wbnqhbzf07",
+        "correlationId": "phase4-cert-1778575386185"
+      }
+    },
+    {
+      "subsystem": "webhook_configuration",
+      "status": "FAIL",
+      "startedAt": "2026-05-12T08:43:07.587Z",
+      "endedAt": "2026-05-12T08:43:27.600Z",
+      "durationMs": 20013,
+      "error": "This operation was aborted"
+    }
+  ]
+}

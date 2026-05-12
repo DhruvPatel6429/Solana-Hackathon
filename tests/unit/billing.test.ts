@@ -6,11 +6,45 @@ import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+const originalFetch = globalThis.fetch;
 let restoreDb: (() => void) | undefined;
 
 beforeEach(async () => {
+  process.env.DODO_API_KEY = "dodo_test_api_key";
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/v1/checkout/sessions")) {
+      return new Response(
+        JSON.stringify({
+          checkoutUrl: "https://billing.example/checkout?checkout=growth",
+          customerId: "dodo_cus_demo_growth",
+          subscriptionId: "dodo_sub_demo_growth",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    if (url.includes("/v1/usage/events")) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          usageEventId: "usage_tx_demo_001",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    return new Response(JSON.stringify({ error: "not mocked" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+
   const installed = await installPrismaTestDb();
   restoreDb = installed.restore;
+  await installed.prisma.company.create({
+    data: { id: "company_demo_01", name: "Demo Billing Co" },
+  });
 });
 
 afterEach(() => {
@@ -18,12 +52,11 @@ afterEach(() => {
   restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
+  globalThis.fetch = originalFetch;
 });
 
 describe("Dodo billing service", () => {
   test("creates a hosted checkout URL without requiring live Dodo credentials", async () => {
-    delete process.env.DODO_API_KEY;
-
     const checkout = await createCheckoutSession({
       companyId: "company_demo_01",
       tier: "Growth",
@@ -36,8 +69,6 @@ describe("Dodo billing service", () => {
   });
 
   test("reports one usage unit for invoice, payout, or FX events", async () => {
-    delete process.env.DODO_API_KEY;
-
     const usage = await reportUsageUnit({
       companyId: "company_demo_01",
       eventType: "payout",
