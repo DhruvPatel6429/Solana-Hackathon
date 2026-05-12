@@ -6,6 +6,7 @@ import { Activity, BarChart3, ClipboardCheck, FileText, LayoutDashboard, LogOut,
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuthSession } from "@/lib/auth/client";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +23,13 @@ const nav = [
 
 export function AppShell({ children, contractor = false }: { children: React.ReactNode; contractor?: boolean }) {
   const pathname = usePathname();
+  const auth = useAuthSession();
   const collapsed = useAppStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useAppStore((state) => state.toggleSidebar);
+  const displayName =
+    auth.user?.user_metadata?.full_name ??
+    auth.user?.email ??
+    (auth.isAuthenticated ? "Signed in user" : "Not signed in");
 
   const links = contractor
     ? [
@@ -62,15 +68,17 @@ export function AppShell({ children, contractor = false }: { children: React.Rea
         </nav>
         <div className="border-t border-white/10 pt-4">
           <div className="mb-3 flex items-center gap-3">
-            <Avatar name={contractor ? "Maya Chen" : "Dhruv Patel"} />
+            <Avatar name={displayName} />
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{contractor ? "Maya Chen" : "Dhruv Patel"}</p>
-                <Badge tone="violet">Growth</Badge>
+                <p className="truncate text-sm font-medium">{displayName}</p>
+                <Badge tone={auth.isAuthenticated ? "emerald" : "amber"}>
+                  {auth.isAuthenticated ? "Authenticated" : "Guest"}
+                </Badge>
               </div>
             )}
           </div>
-          <Button variant="ghost" className="w-full justify-start" size="sm">
+          <Button variant="ghost" className="w-full justify-start" size="sm" onClick={() => auth.signOut()}>
             <LogOut className="h-4 w-4" />
             {!collapsed && "Logout"}
           </Button>

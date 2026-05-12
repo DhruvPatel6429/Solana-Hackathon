@@ -20,7 +20,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { api } from "@/lib/api";
+import { decodeJwtPayload, getMetadataString, useAuthSession } from "@/lib/auth/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,19 +41,6 @@ interface FieldErrors {
   [key: `line_${number}_unitPrice`]: string | undefined;
   notes?: string;
   form?: string;
-}
-
-// ─── Supabase client ──────────────────────────────────────────────────────────
-
-function createSupabaseBrowserClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return null;
-  }
-
-  return createClient(url, anonKey);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -143,9 +131,9 @@ function Input({
 
 export default function NewInvoicePage() {
   const router = useRouter();
+  const auth = useAuthSession();
 
   // ── Auth state ──────────────────────────────────────────────────────────
-  const [token, setToken]               = useState<string | null>(null);
   const [contractorId, setContractorId] = useState<string | null>(null);
   const [authError, setAuthError]       = useState<string | null>(null);
 
@@ -166,41 +154,24 @@ export default function NewInvoicePage() {
 
   // ── Auth ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      setAuthError("Supabase environment variables are not configured.");
+    if (auth.loading) {
       return;
     }
 
-    const auth = supabase.auth as any;
+    if (!auth.accessToken) {
+      setAuthError("Not authenticated. Please sign in.");
+      return;
+    }
 
-    auth.getSession().then(({ data: { session } }: { data: { session: { access_token?: string } | null } }) => {
-      if (!session?.access_token) {
-        setAuthError("Not authenticated. Please sign in.");
-        return;
-      }
-      setToken(session.access_token);
+    const cid = getMetadataString(decodeJwtPayload(auth.accessToken), "contractorId");
+    if (!cid) {
+      setAuthError("No contractor profile linked to this account.");
+      return;
+    }
 
-      // Decode contractorId from JWT user_metadata
-      try {
-        const payload = JSON.parse(atob(session.access_token.split(".")[1]));
-        const cid = payload?.user_metadata?.contractorId as string | undefined;
-        if (!cid) {
-          setAuthError("No contractor profile linked to this account.");
-        } else {
-          setContractorId(cid);
-        }
-      } catch {
-        setAuthError("Failed to decode session.");
-      }
-    });
-
-    const { data: { subscription } } = auth.onAuthStateChange((_e: string, session: { access_token?: string } | null) => {
-      setToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    setContractorId(cid);
+    setAuthError(null);
+  }, [auth.accessToken, auth.loading]);
 
   // ── Line item helpers ───────────────────────────────────────────────────
   const addLineItem = useCallback(() => {
@@ -260,7 +231,7 @@ export default function NewInvoicePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
-    if (!token || !contractorId) {
+    if (!auth.isAuthenticated || !contractorId) {
       setErrors({ form: "Authentication required. Please refresh and sign in." });
       return;
     }
@@ -278,26 +249,12 @@ export default function NewInvoicePage() {
         quantity: parseNumber(item.quantity),
         unitPrice: parseNumber(item.unitPrice),
       })),
-      currency: "USDC",
+      currency: "USDC" as const,
       notes: notes.trim() || undefined,
     };
 
     try {
-      const res = await fetch("/api/invoices", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setErrors({ form: data.error ?? "Submission failed. Please try again." });
-        return;
-      }
+      await api.createInvoice(payload);
 
       setSubmitted(true);
       // Brief pause so the success state is visible, then redirect

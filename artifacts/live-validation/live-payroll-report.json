@@ -1,0 +1,186 @@
+{
+  "name": "run-live-payroll-flow",
+  "generatedAt": "2026-05-11T19:04:56.230Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Create test company + contractor + invoice",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:06.551Z",
+      "endedAt": "2026-05-11T19:04:08.695Z",
+      "durationMs": 2144,
+      "details": {
+        "companyId": "company_live_1778526246551_a0e104",
+        "contractorId": "contractor_live_1778526246551_a0e104",
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "invoiceAmountUsdc": 0.05
+      }
+    },
+    {
+      "name": "Snapshot balances before payout",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:08.695Z",
+      "endedAt": "2026-05-11T19:04:09.071Z",
+      "durationMs": 376,
+      "details": {
+        "contractorBefore": {
+          "amount": "1550000",
+          "uiAmount": 1.55,
+          "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+        },
+        "treasuryBefore": {
+          "amount": "1998045000",
+          "uiAmount": 1998.045,
+          "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+        }
+      }
+    },
+    {
+      "name": "Initialize escrow",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:09.071Z",
+      "endedAt": "2026-05-11T19:04:22.223Z",
+      "durationMs": 13152,
+      "details": {
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP",
+        "vault": "C1hyRFk7Y1AXRM3Y3bm1AM4mUAizmnvsQ41NdUv2t8c6",
+        "signature": "2XzTafa6HmnmUXYgWCMMAYPJ9EdHQaREta9VVjpBiXKP1foArkd7FsSeHaJ1ZiDqPrgaqh6nBf7zcQeL2H8Cwsux"
+      }
+    },
+    {
+      "name": "Deposit devnet USDC to escrow",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:22.224Z",
+      "endedAt": "2026-05-11T19:04:35.755Z",
+      "durationMs": 13531,
+      "details": {
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP",
+        "signature": "MAm74QADMRicchAgGRmDQ5kEUC6dGuyc5LAy1oRFsZb16ExGinp4QCMejqnuB5kqtregWEtcpzcDVhkkDFjygui",
+        "amountBaseUnits": "50000"
+      }
+    },
+    {
+      "name": "Approve invoice",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:35.755Z",
+      "endedAt": "2026-05-11T19:04:38.074Z",
+      "durationMs": 2319,
+      "details": {
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "status": "APPROVED",
+        "approvedAt": "2026-05-11T19:04:36.847Z"
+      }
+    },
+    {
+      "name": "Release escrow via payout execution",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:38.074Z",
+      "endedAt": "2026-05-11T19:04:53.928Z",
+      "durationMs": 15854,
+      "details": {
+        "payoutId": "cmp1kmjhb0002h4uahweco8ej",
+        "payoutSignature": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7",
+        "explorerUrl": "https://explorer.solana.com/tx/2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7?cluster=devnet"
+      }
+    },
+    {
+      "name": "Verify contractor balance delta",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:53.928Z",
+      "endedAt": "2026-05-11T19:04:54.151Z",
+      "durationMs": 223,
+      "details": {
+        "contractorBefore": {
+          "amount": "1550000",
+          "uiAmount": 1.55,
+          "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+        },
+        "contractorAfter": {
+          "amount": "1600000",
+          "uiAmount": 1.6,
+          "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+        },
+        "treasuryBefore": {
+          "amount": "1998045000",
+          "uiAmount": 1998.045,
+          "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+        },
+        "treasuryAfter": {
+          "amount": "1997995000",
+          "uiAmount": 1997.995,
+          "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+        }
+      }
+    },
+    {
+      "name": "Verify DB persistence + explorer transaction",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:54.151Z",
+      "endedAt": "2026-05-11T19:04:54.978Z",
+      "durationMs": 827,
+      "details": {
+        "invoiceStatus": "PAID",
+        "payoutStatus": "CONFIRMED",
+        "payoutId": "cmp1kmjhb0002h4uahweco8ej",
+        "payoutSignature": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7",
+        "explorerUrl": "https://explorer.solana.com/tx/2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7?cluster=devnet"
+      }
+    },
+    {
+      "name": "Verify dashboard state (metrics + reconciliation)",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:04:54.978Z",
+      "endedAt": "2026-05-11T19:04:56.069Z",
+      "durationMs": 1091,
+      "details": {
+        "metrics": {
+          "payouts": {
+            "total": 1,
+            "confirmed": 1,
+            "failed": 0,
+            "pending": 0,
+            "successRate": 1
+          },
+          "treasury": {
+            "totalBalanceUsdc": 0,
+            "wallets": [
+              {
+                "companyId": "company_live_1778526246551_a0e104",
+                "companyName": "Phase4 Company live_1778526246551_a0e104",
+                "walletAddress": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
+                "balanceUsdc": 0,
+                "updatedAt": null
+              }
+            ]
+          }
+        },
+        "reconciliationSummary": {
+          "open": 0,
+          "critical": 0,
+          "failedJobs": 0,
+          "deadLetterWebhooks": 10
+        }
+      }
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 0
+  },
+  "runId": "live_1778526246551_a0e104",
+  "companyId": "company_live_1778526246551_a0e104",
+  "contractorId": "contractor_live_1778526246551_a0e104",
+  "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+  "payoutId": "cmp1kmjhb0002h4uahweco8ej",
+  "signatures": {
+    "initialize": "2XzTafa6HmnmUXYgWCMMAYPJ9EdHQaREta9VVjpBiXKP1foArkd7FsSeHaJ1ZiDqPrgaqh6nBf7zcQeL2H8Cwsux",
+    "deposit": "MAm74QADMRicchAgGRmDQ5kEUC6dGuyc5LAy1oRFsZb16ExGinp4QCMejqnuB5kqtregWEtcpzcDVhkkDFjygui",
+    "release": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7"
+  },
+  "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP"
+}

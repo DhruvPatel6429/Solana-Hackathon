@@ -1,10 +1,31 @@
-export async function POST(request: Request) {
-  const { createCheckoutSession } = await import("@/lib/services/billing.service");
-  const body = await request.json().catch(() => ({ tier: "growth", companyId: "company_demo_01" }));
-  const tier = typeof body.tier === "string" ? body.tier : "growth";
-  const companyId = typeof body.companyId === "string" ? body.companyId : "company_demo_01";
-  const origin = request.headers.get("origin") ?? undefined;
-  const checkout = await createCheckoutSession({ companyId, tier, origin });
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireTenantContext } from "@/lib/auth/server";
+import { createCheckoutSession } from "@/lib/services/billing.service";
 
-  return Response.json(checkout);
+export async function POST(request: Request) {
+  try {
+    const tenant = await requireTenantContext(request);
+    const body = await request.json().catch(() => ({ tier: "growth" }));
+    const tier = typeof body.tier === "string" ? body.tier : "growth";
+    const origin = request.headers.get("origin") ?? undefined;
+    const checkout = await createCheckoutSession({
+      companyId: tenant.companyId,
+      tier,
+      origin,
+    });
+
+    return Response.json(checkout);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("[dodo]")) {
+      return Response.json(
+        {
+          error: "Unable to create billing checkout.",
+          details: error.message,
+        },
+        { status: 502 },
+      );
+    }
+
+    return toHttpErrorResponse(error);
+  }
 }

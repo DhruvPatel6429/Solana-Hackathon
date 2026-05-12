@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRequiredAuthHeaders } from "@/lib/auth/client";
 
 type DemoSeedResponse = {
   success: boolean;
@@ -47,24 +48,6 @@ type StatusLogEntry = {
 
 const isJudgeModeEnabled = process.env.NEXT_PUBLIC_JUDGE_MODE === "true";
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  const localToken = window.localStorage.getItem("bp_access_token");
-  const sessionToken = window.sessionStorage.getItem("bp_access_token");
-  const token = localToken || sessionToken;
-
-  if (!token) {
-    return {};
-  }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
-
 function shortTx(signature: string): string {
   if (signature.length <= 12) {
     return signature;
@@ -107,11 +90,12 @@ export function JudgeDemoPanel() {
     url: string,
     init?: RequestInit,
   ): Promise<T> => {
+    const authHeaders = await getRequiredAuthHeaders();
     const response = await fetch(url, {
       ...init,
       headers: {
         "content-type": "application/json",
-        ...getAuthHeaders(),
+        ...authHeaders,
         ...(init?.headers ?? {}),
       },
     });
@@ -214,10 +198,11 @@ export function JudgeDemoPanel() {
       downloadAuditCsv: async () => {
         setActiveAction("audit");
         try {
-          const response = await fetch("/api/audit/export?format=csv", {
+            const authHeaders = await getRequiredAuthHeaders();
+            const response = await fetch("/api/audit/export?format=csv", {
             method: "GET",
             headers: {
-              ...getAuthHeaders(),
+                ...authHeaders,
             },
           });
 
@@ -280,7 +265,7 @@ export function JudgeDemoPanel() {
         </Button>
       </div>
 
-      <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-5 rounded-lg border border-white/10 bg-zinc-900 p-4">
         <p className="metric-label mb-3">Status log</p>
         {logs.length === 0 ? (
           <p className="text-sm text-zinc-500">No actions run yet.</p>

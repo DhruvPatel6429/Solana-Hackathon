@@ -1,1 +1,1 @@
-// Responsibility: React hook for treasury data placeholder.
+export { useTreasuryBalance } from "@/hooks/use-app-data";

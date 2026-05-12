@@ -42,8 +42,19 @@ export async function createCheckoutSession({
   const checkout = await createDodoCheckout({
     companyId,
     tier,
-    successUrl: origin ? `${origin}/dashboard?billing=success` : undefined,
+    successUrl: origin
+      ? `${origin}/onboarding?checkout=${encodeURIComponent(tier.toLowerCase())}&provider=dodo`
+      : undefined,
   });
+
+  await db.company.update({
+    where: { id: companyId },
+    data: {
+      planTier: tier,
+      ...(checkout.customerId ? { dodoCustomerId: checkout.customerId } : {}),
+      ...(checkout.subscriptionId ? { dodoSubscriptionId: checkout.subscriptionId } : {}),
+    },
+  }).catch(() => undefined);
 
   return {
     url: checkout.checkoutUrl,
@@ -61,12 +72,28 @@ export async function reportUsageUnit({
   eventType: "invoice" | "payout" | "fx_quote";
   referenceId?: string;
 }): Promise<UsageReport> {
-  return reportDodoUsage({
+  const usage = await reportDodoUsage({
     companyId,
     eventType,
     referenceId,
     units: 1,
   });
+
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { organizationId: true },
+  });
+
+  await db.usageEvent.create({
+    data: {
+      organizationId: company?.organizationId ?? null,
+      companyId,
+      eventType,
+      dodoEventId: usage.usageEventId,
+    },
+  }).catch(() => undefined);
+
+  return usage;
 }
 
 function decimalString(value: unknown): string {

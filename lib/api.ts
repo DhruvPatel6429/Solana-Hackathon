@@ -1,4 +1,6 @@
-import { fxRates } from "./mock-data";
+"use client";
+
+import { getRequiredAuthHeaders, refreshAccessToken } from "@/lib/auth/client";
 import type { Contractor } from "@/types/contractor";
 import type { Invoice, InvoiceStatus } from "@/types/invoice";
 import type { Payout } from "@/types/payout";
@@ -18,6 +20,10 @@ type ApiErrorPayload = {
   details?: string;
 };
 
+type ApiRequestInit = RequestInit & {
+  auth?: boolean;
+};
+
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -29,34 +35,63 @@ export class ApiRequestError extends Error {
   }
 }
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  const localToken = window.localStorage.getItem("bp_access_token");
-  const sessionToken = window.sessionStorage.getItem("bp_access_token");
-  const token = localToken || sessionToken;
-
-  if (!token) {
-    return {};
-  }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+function methodRequiresIdempotency(method?: string): boolean {
+  const normalized = (method ?? "GET").toUpperCase();
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(normalized);
 }
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+function idempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export async function apiFetchJson<T>(url: string, init?: ApiRequestInit): Promise<T> {
   try {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        "content-type": "application/json",
-        ...getAuthHeaders(),
-        ...(init?.headers ?? {}),
-      },
+    const requiresAuth = init?.auth !== false;
+    const { auth: _auth, ...requestInit } = init ?? {};
+    let authHeaders: HeadersInit = {};
+    if (requiresAuth) {
+      try {
+        authHeaders = await getRequiredAuthHeaders();
+      } catch (error) {
+        throw new ApiRequestError(
+          error instanceof Error ? error.message : "Sign in is required.",
+          401,
+        );
+      }
+    }
+    const initHeaders = new Headers(init?.headers);
+    if (methodRequiresIdempotency(init?.method) && !initHeaders.has("x-idempotency-key") && !initHeaders.has("idempotency-key")) {
+      initHeaders.set("x-idempotency-key", idempotencyKey());
+    }
+
+    const baseHeaders = {
+      "content-type": "application/json",
+      ...authHeaders,
+      ...Object.fromEntries(initHeaders.entries()),
+    };
+
+    let response = await fetch(url, {
+      ...requestInit,
+      headers: baseHeaders,
     });
+
+    if (response.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        response = await fetch(url, {
+          ...requestInit,
+          headers: {
+            "content-type": "application/json",
+            Authorization: `Bearer ${refreshedToken}`,
+            ...Object.fromEntries(initHeaders.entries()),
+          },
+        });
+      }
+    }
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
@@ -78,6 +113,8 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     );
   }
 }
+
+const fetchJson = apiFetchJson;
 
 function buildAuditQuery(params?: AuditQuery): string {
   if (!params) return "";
@@ -126,6 +163,7 @@ type ApiInvoice = {
   amountUsdc: unknown;
   status: string;
   submittedAt: string;
+  approvedAt?: string | null;
   description?: string | null;
   notes?: string | null;
   contractor?: { id?: string; name?: string | null; country?: string | null };
@@ -146,6 +184,108 @@ type BatchPayoutResponse = {
   txHash: string;
   txSignature: string;
   payoutIds?: string[];
+};
+
+type TreasuryBalanceResponse = {
+  balance: number;
+  wallet?: string;
+  source: "solana" | "cache" | "error";
+  error?: string;
+  updatedAt?: string | null;
+};
+
+type CompanyOverviewResponse = {
+  company: {
+    id: string;
+    name: string;
+    planTier: string;
+    createdAt: string;
+    treasuryWalletAddress?: string | null;
+    treasuryBalanceUsdc: number;
+    treasuryBalanceUpdatedAt?: string | null;
+    feeWalletAddress?: string | null;
+  };
+  billing: {
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    status: string;
+    webhookSync: "confirmed" | "stale" | "pending";
+    latestEventAt?: string | null;
+    latestPaymentId?: string | null;
+    recentEvents: Array<{
+      id: string;
+      dodoPaymentId: string;
+      amountUsd: number;
+      currency: string;
+      status: string;
+      createdAt: string;
+    }>;
+  };
+  treasury: {
+    walletAddress?: string | null;
+    balanceUsdc: number;
+    updatedAt?: string | null;
+    webhookSync: "confirmed" | "stale" | "pending";
+    latestTransactions: Array<{
+      id: string;
+      signature: string;
+      walletAddress: string;
+      amountUsdc: number;
+      direction: string;
+      source?: string | null;
+      destination?: string | null;
+      createdAt: string;
+    }>;
+  };
+  webhooks: {
+    latestEvents: Array<{
+      id: string;
+      provider: string;
+      eventType: string;
+      externalId?: string | null;
+      processed: boolean;
+      processedAt?: string | null;
+      createdAt: string;
+    }>;
+  };
+  operations: {
+    invoiceCounts: {
+      pending: number;
+      approved: number;
+      rejected: number;
+      paid: number;
+    };
+    payoutCounts: {
+      pending: number;
+      confirmed: number;
+      failed: number;
+    };
+    activeEscrows: number;
+    recentPayouts: Array<{
+      id: string;
+      invoiceId: string;
+      contractorName: string;
+      amountUsdc: number;
+      escrowPda?: string | null;
+      txSignature?: string | null;
+      status: string;
+      executedAt?: string | null;
+      createdAt: string;
+    }>;
+  };
+};
+
+type SignupResponse = {
+  success: boolean;
+  companyId: string;
+};
+
+type ValidationResponse = {
+  success: boolean;
+  kind: string;
+  artifactPath?: string;
+  artifact?: unknown;
+  error?: string;
 };
 
 function normalizeKycStatus(value?: string | null): Contractor["kycStatus"] {
@@ -212,6 +352,7 @@ function normalizeInvoice(row: ApiInvoice): Invoice {
     amount: toNumber(row.amountUsdc),
     currency: "USDC",
     submittedAt: formatDate(row.submittedAt),
+    approvedAt: row.approvedAt ? formatDate(row.approvedAt) : undefined,
     status: normalizeInvoiceStatus(row.status),
     txHash: payout?.solanaTxSignature ?? payout?.txSignature ?? undefined,
     description: row.description ?? row.notes ?? "",
@@ -219,17 +360,40 @@ function normalizeInvoice(row: ApiInvoice): Invoice {
 }
 
 export const api = {
-  treasuryBalance: () => fetchJson<{ balance: number; wallet?: string; source: "solana" | "cache" | "error"; error?: string }>("/api/treasury/balance"),
+  signup: (body: { companyName?: string; planTier?: string }) =>
+    fetchJson<SignupResponse>("/api/auth/signup", { method: "POST", body: JSON.stringify(body) }),
+  treasuryBalance: () => fetchJson<TreasuryBalanceResponse>("/api/treasury/balance"),
   contractors: async () => {
     const response = await fetchJson<ContractorsResponse>("/api/contractors");
     return response.contractors.map(normalizeContractor);
   },
+  createContractor: (body: {
+    name: string;
+    email: string;
+    country: string;
+    taxId: string;
+    payoutPreference: "USDC" | "FIAT";
+    walletAddress?: string;
+    preferredFiatCurrency?: string;
+  }) => fetchJson<{ contractor: unknown }>("/api/contractors", { method: "POST", body: JSON.stringify(body) }),
   invoices: async () => {
     const response = await fetchJson<InvoicesResponse>("/api/invoices");
     return response.invoices.map(normalizeInvoice);
   },
+  createInvoice: (body: {
+    contractorId: string;
+    amountUsdc: number;
+    workPeriodStart: string;
+    workPeriodEnd: string;
+    lineItems: Array<{ description: string; quantity: number; unitPrice: number }>;
+    currency?: "USDC";
+    notes?: string;
+  }) => fetchJson<{ invoice: unknown }>("/api/invoices", { method: "POST", body: JSON.stringify(body) }),
   approveInvoice: (id: string) =>
-    fetchJson<{ success: boolean; txHash: string; txSignature?: string }>(`/api/invoices/${id}/approve`, { method: "PATCH" }),
+    fetchJson<{ success: boolean; txHash?: string; txSignature?: string }>(`/api/invoices/${id}/approve`, {
+      method: "PATCH",
+      body: JSON.stringify({ settle: false }),
+    }),
   rejectInvoice: (id: string, reason: string) =>
     fetchJson<{ success?: boolean; invoice?: unknown }>(`/api/invoices/${id}/reject`, { method: "PATCH", body: JSON.stringify({ reason }) }),
   executePayouts: (invoiceIds: string[]) =>
@@ -237,6 +401,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ invoiceIds }),
     }),
+  escrowStatus: (invoiceId: string) =>
+    fetchJson<{ success: boolean; escrow: unknown }>(`/api/escrow/${invoiceId}`),
   payouts: (params?: AuditQuery) => fetchJson<Payout[]>(`/api/payouts${buildAuditQuery(params)}`),
   exportAudit: (params?: AuditQuery) => fetchJson<Payout[]>(`/api/audit/export${buildAuditQuery(params)}`),
   downloadAuditCsv: async (params?: AuditQuery) => {
@@ -244,9 +410,10 @@ export const api = {
     const filename = `audit-export-${new Date().toISOString().slice(0, 10)}.csv`;
 
     try {
+      const authHeaders = await getRequiredAuthHeaders();
       const response = await fetch(url, {
         headers: {
-          ...getAuthHeaders(),
+          ...authHeaders,
         },
       });
 
@@ -264,15 +431,26 @@ export const api = {
   checkout: (tier: string) =>
     fetchJson<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ tier }) }),
   fxRates: async () => {
-    await api.reportUsage("fx_quote", "fx-refresh");
+    const response = await fetchJson<{
+      base: string;
+      rates: Array<{ pair: string; rate: number; updatedAt: string }>;
+    }>("/api/fx/rates");
+    await api.reportUsage("fx_quote", "fx-refresh").catch(() => undefined);
     await wait();
-    return fxRates.map((rate) => ({ ...rate, refreshedAt: new Date().toLocaleTimeString() }));
+    return response.rates.map((rate) => ({
+      pair: rate.pair,
+      rate: rate.rate.toFixed(3),
+      updatedAt: rate.updatedAt,
+    }));
   },
   reportUsage: (eventType: "invoice" | "payout" | "fx_quote" = "payout", referenceId?: string) =>
     fetchJson<void>("/api/billing/report-usage", { method: "POST", body: JSON.stringify({ eventType, referenceId }) }),
+  companyOverview: () => fetchJson<CompanyOverviewResponse>("/api/admin/company-overview"),
   systemHealth: () => fetchJson<any>("/api/admin/system-health"),
   systemMetrics: () => fetchJson<any>("/api/admin/metrics"),
   reconciliationReport: () => fetchJson<any>("/api/admin/reconciliation-report"),
   recoverPayouts: () => fetchJson<any>("/api/admin/recovery/payouts", { method: "POST", body: JSON.stringify({}) }),
   replayWebhooks: () => fetchJson<any>("/api/admin/recovery/webhooks", { method: "POST", body: JSON.stringify({}) }),
+  runValidation: (kind: "validate-anchor" | "live-payroll" | "batch" | "split" | "dodo" | "helius") =>
+    fetchJson<ValidationResponse>(`/api/admin/validation/${kind}`, { method: "POST", body: JSON.stringify({}) }),
 };

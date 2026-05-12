@@ -1,0 +1,109 @@
+{
+  "name": "run-split-validation",
+  "generatedAt": "2026-05-11T19:06:43.116Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Seed split validation company",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:06:25.882Z",
+      "endedAt": "2026-05-11T19:06:26.881Z",
+      "durationMs": 999,
+      "details": {
+        "companyId": "company_split_1778526385394_db016b",
+        "treasuryWallet": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP"
+      }
+    },
+    {
+      "name": "Execute split settlement",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:06:26.881Z",
+      "endedAt": "2026-05-11T19:06:40.191Z",
+      "durationMs": 13310,
+      "details": {
+        "signature": "4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf",
+        "explorerUrl": "https://explorer.solana.com/tx/4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf?cluster=devnet",
+        "amountUsdc": 0.1,
+        "expectedContractorPercent": 95,
+        "expectedFeePercent": 5
+      }
+    },
+    {
+      "name": "Verify 95/5 routing from balances",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:06:40.191Z",
+      "endedAt": "2026-05-11T19:06:40.559Z",
+      "durationMs": 368,
+      "details": {
+        "expected": {
+          "contractor": "95000",
+          "fee": "5000",
+          "total": "100000"
+        },
+        "actual": {
+          "contractor": "95000",
+          "fee": "5000",
+          "treasury": "100000"
+        }
+      }
+    },
+    {
+      "name": "Verify explorer tx + reconciliation record",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:06:40.559Z",
+      "endedAt": "2026-05-11T19:06:43.116Z",
+      "durationMs": 2557,
+      "details": {
+        "signature": "4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf",
+        "explorerUrl": "https://explorer.solana.com/tx/4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf?cluster=devnet",
+        "reconciliationAuditId": "cmp1kp5lj0000i8uaq27xeqnn"
+      }
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0
+  },
+  "runId": "split_1778526385394_db016b",
+  "companyId": "company_split_1778526385394_db016b",
+  "signature": "4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf",
+  "explorerUrl": "https://explorer.solana.com/tx/4XkBwu4UuVk8kYLb2vh6wAJn4ZjqtqNiqeDEZjVd1czjZtekkNoKqpWzV5zgZrpeZxAkifnyEnNeqnZ5JEp4Jyhf?cluster=devnet",
+  "before": {
+    "contractor": {
+      "amount": "1600000",
+      "uiAmount": 1.6,
+      "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+    },
+    "fee": {
+      "amount": "5000",
+      "uiAmount": 0.005,
+      "tokenAccount": "8BjzHTDs6DD8sawe1ovFMnXByYGVXv6UyqtHXBckAG59"
+    },
+    "treasury": {
+      "amount": "1997895000",
+      "uiAmount": 1997.895,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    }
+  },
+  "after": {
+    "contractor": {
+      "amount": "1695000",
+      "uiAmount": 1.695,
+      "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+    },
+    "fee": {
+      "amount": "10000",
+      "uiAmount": 0.01,
+      "tokenAccount": "8BjzHTDs6DD8sawe1ovFMnXByYGVXv6UyqtHXBckAG59"
+    },
+    "treasury": {
+      "amount": "1997795000",
+      "uiAmount": 1997.795,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    }
+  },
+  "amountUsdc": 0.1
+}

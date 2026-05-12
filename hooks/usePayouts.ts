@@ -1,1 +1,1 @@
-// Responsibility: React hook for payouts data placeholder.
+export { useExecutePayouts } from "@/hooks/use-app-data";

@@ -1,4 +1,11 @@
-import { payouts } from "@/lib/mock-data";
+import { NextResponse } from "next/server";
+
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { buildGenericCsv, buildPayoutCsv } from "@/lib/audit/csv";
+import { prisma } from "@/lib/db/prisma";
+import { listPayoutsByCompany } from "@/lib/db/queries/payouts";
+import { logAuditExported } from "@/lib/services/audit.service";
 
 type PayoutListFilters = {
   search?: string;
@@ -25,58 +32,10 @@ function parseFilters(request: Request): PayoutListFilters & { format: string } 
   } as PayoutListFilters & { format: string; type: string };
 }
 
-function buildCsv(rows: typeof payouts) {
-  return [
-    "id,contractor,amount,currency,date,invoiceId,txHash,kycStatus",
-    ...rows.map((row) => [row.id, row.contractor, row.amount.toFixed(2), row.currency, row.date, row.invoiceId, row.txHash, row.kycStatus].join(",")),
-  ].join("\n");
-}
-
 export async function GET(request: Request) {
   const filters = parseFilters(request);
 
-  if (!request.headers.get("authorization")) {
-    const { AuthenticationError } = await import("@/lib/auth/server");
-    const { toHttpErrorResponse } = await import("@/lib/auth/http");
-    return toHttpErrorResponse(
-      new AuthenticationError("Missing Authorization header."),
-    );
-  }
-
-  if (!process.env.DATABASE_URL) {
-    if (process.env.NODE_ENV === "production") {
-      return Response.json(
-        { error: "DATABASE_URL is required to export audit data." },
-        { status: 500 },
-      );
-    }
-
-    const query = filters.search?.trim().toLowerCase();
-    const rows = payouts.filter((payout) => {
-      if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;
-      if (query && !`${payout.contractor} ${payout.invoiceId} ${payout.txHash}`.toLowerCase().includes(query)) return false;
-      return true;
-    });
-
-    if (filters.format === "csv") {
-      const today = new Date().toISOString().slice(0, 10);
-      return new Response(buildCsv(rows), {
-        headers: {
-          "content-type": "text/csv; charset=utf-8",
-          "content-disposition": `attachment; filename=\"audit-export-${today}.csv\"`,
-        },
-      });
-    }
-
-    return Response.json(rows);
-  }
-
   try {
-    const { requireAdmin } = await import("@/lib/auth/require-admin");
-    const { listPayoutsByCompany } = await import("@/lib/db/queries/payouts");
-    const { buildGenericCsv, buildPayoutCsv } = await import("@/lib/audit/csv");
-    const { logAuditExported } = await import("@/lib/services/audit.service");
-    const { prisma } = await import("@/lib/db/prisma");
     const tenant = await requireAdmin(request);
     const db = prisma as any;
 
@@ -191,9 +150,8 @@ export async function GET(request: Request) {
       });
     }
 
-    return Response.json(rows);
+    return NextResponse.json(rows);
   } catch (error) {
-    const { toHttpErrorResponse } = await import("@/lib/auth/http");
     return toHttpErrorResponse(error);
   }
 }

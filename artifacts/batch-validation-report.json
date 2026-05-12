@@ -1,0 +1,247 @@
+{
+  "name": "run-batch-validation",
+  "generatedAt": "2026-05-11T19:05:59.014Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Seed batch validation company + contractor wallets",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:05:39.551Z",
+      "endedAt": "2026-05-11T19:05:42.286Z",
+      "durationMs": 2735,
+      "details": {
+        "companyId": "company_batch_1778526339551_4d89df",
+        "recipientCount": 5
+      }
+    },
+    {
+      "name": "Snapshot pre-batch balances",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:05:42.286Z",
+      "endedAt": "2026-05-11T19:05:43.409Z",
+      "durationMs": 1123,
+      "details": {
+        "treasury": {
+          "amount": "1997995000",
+          "uiAmount": 1997.995,
+          "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+        },
+        "recipients": [
+          {
+            "wallet": "BZvHgkREBmzL8vxe3Rio2DkgfN2ykcuaprLM9S29UX6t",
+            "balance": {
+              "amount": "20000",
+              "uiAmount": 0.02,
+              "tokenAccount": "4kYH4d4FnExWeS2yCn71iAKg6YG1THn7g3yGTEsHPffa"
+            }
+          },
+          {
+            "wallet": "DKhbnU37sMNVFnxoWHnbtkFnigRd1vz99ahg2uKXx3RH",
+            "balance": {
+              "amount": "20000",
+              "uiAmount": 0.02,
+              "tokenAccount": "9PjZUZYv8Li6ESAteHsBYGYjaQAAZCQKQgao9GDmfDSe"
+            }
+          },
+          {
+            "wallet": "E5XEADL9DFMWCLhFZzvC8uWMojpGQxejj3RmF1Nh6eTX",
+            "balance": {
+              "amount": "20000",
+              "uiAmount": 0.02,
+              "tokenAccount": "41K3hjXxykDn7jZ3kaaExX44JzdHiNsxDvySC47X9dRY"
+            }
+          },
+          {
+            "wallet": "8riWK2Q55zfzXtG1pbaYt1P27347MA4Pa6AqaBgkFXcE",
+            "balance": {
+              "amount": "20000",
+              "uiAmount": 0.02,
+              "tokenAccount": "A6TuzdmkgkGSHmDMANHFCSTeJ5Z5eSh7VjUKxLuQy13X"
+            }
+          },
+          {
+            "wallet": "9ZVUAxA5EsUtHR3B1EFdT59KfHczSPMTWkDS819n8uVY",
+            "balance": {
+              "amount": "20000",
+              "uiAmount": 0.02,
+              "tokenAccount": "AQCNcucTgpYJQ7KTseHccDFR2cRZaUVybM5U2Cp4ZNAD"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Execute atomic batch payout",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:05:43.409Z",
+      "endedAt": "2026-05-11T19:05:56.953Z",
+      "durationMs": 13544,
+      "details": {
+        "signature": "4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj",
+        "explorerUrl": "https://explorer.solana.com/tx/4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj?cluster=devnet",
+        "recipientCount": 5,
+        "totalAmount": 0.1
+      }
+    },
+    {
+      "name": "Verify balances changed correctly",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:05:56.953Z",
+      "endedAt": "2026-05-11T19:05:57.750Z",
+      "durationMs": 797,
+      "details": {
+        "recipientDeltas": [
+          {
+            "wallet": "BZvHgkREBmzL8vxe3Rio2DkgfN2ykcuaprLM9S29UX6t",
+            "before": "20000",
+            "after": "40000",
+            "delta": "20000",
+            "expected": "20000"
+          },
+          {
+            "wallet": "DKhbnU37sMNVFnxoWHnbtkFnigRd1vz99ahg2uKXx3RH",
+            "before": "20000",
+            "after": "40000",
+            "delta": "20000",
+            "expected": "20000"
+          },
+          {
+            "wallet": "E5XEADL9DFMWCLhFZzvC8uWMojpGQxejj3RmF1Nh6eTX",
+            "before": "20000",
+            "after": "40000",
+            "delta": "20000",
+            "expected": "20000"
+          },
+          {
+            "wallet": "8riWK2Q55zfzXtG1pbaYt1P27347MA4Pa6AqaBgkFXcE",
+            "before": "20000",
+            "after": "40000",
+            "delta": "20000",
+            "expected": "20000"
+          },
+          {
+            "wallet": "9ZVUAxA5EsUtHR3B1EFdT59KfHczSPMTWkDS819n8uVY",
+            "before": "20000",
+            "after": "40000",
+            "delta": "20000",
+            "expected": "20000"
+          }
+        ],
+        "treasury": {
+          "before": "1997995000",
+          "after": "1997895000",
+          "delta": "100000",
+          "expectedAtLeast": "100000"
+        }
+      }
+    },
+    {
+      "name": "Verify explorer transaction + DB reconciliation",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:05:57.750Z",
+      "endedAt": "2026-05-11T19:05:59.014Z",
+      "durationMs": 1264,
+      "details": {
+        "signature": "4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj",
+        "explorerUrl": "https://explorer.solana.com/tx/4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj?cluster=devnet",
+        "reconciliationAuditId": "cmp1ko8l00000z8uajzgkez97"
+      }
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0
+  },
+  "runId": "batch_1778526339551_4d89df",
+  "companyId": "company_batch_1778526339551_4d89df",
+  "signature": "4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj",
+  "explorerUrl": "https://explorer.solana.com/tx/4MfW5W3dWAbWz37BcDafG6brucjdE8dee2qigmRLwTTLSaPd2dpTejkjRR8ApxGUkVpmrLhuo9hhM57GhEgEtwTj?cluster=devnet",
+  "recipients": [
+    {
+      "wallet": "BZvHgkREBmzL8vxe3Rio2DkgfN2ykcuaprLM9S29UX6t",
+      "amountUsdc": 0.02,
+      "before": {
+        "amount": "20000",
+        "uiAmount": 0.02,
+        "tokenAccount": "4kYH4d4FnExWeS2yCn71iAKg6YG1THn7g3yGTEsHPffa"
+      },
+      "after": {
+        "amount": "40000",
+        "uiAmount": 0.04,
+        "tokenAccount": "4kYH4d4FnExWeS2yCn71iAKg6YG1THn7g3yGTEsHPffa"
+      }
+    },
+    {
+      "wallet": "DKhbnU37sMNVFnxoWHnbtkFnigRd1vz99ahg2uKXx3RH",
+      "amountUsdc": 0.02,
+      "before": {
+        "amount": "20000",
+        "uiAmount": 0.02,
+        "tokenAccount": "9PjZUZYv8Li6ESAteHsBYGYjaQAAZCQKQgao9GDmfDSe"
+      },
+      "after": {
+        "amount": "40000",
+        "uiAmount": 0.04,
+        "tokenAccount": "9PjZUZYv8Li6ESAteHsBYGYjaQAAZCQKQgao9GDmfDSe"
+      }
+    },
+    {
+      "wallet": "E5XEADL9DFMWCLhFZzvC8uWMojpGQxejj3RmF1Nh6eTX",
+      "amountUsdc": 0.02,
+      "before": {
+        "amount": "20000",
+        "uiAmount": 0.02,
+        "tokenAccount": "41K3hjXxykDn7jZ3kaaExX44JzdHiNsxDvySC47X9dRY"
+      },
+      "after": {
+        "amount": "40000",
+        "uiAmount": 0.04,
+        "tokenAccount": "41K3hjXxykDn7jZ3kaaExX44JzdHiNsxDvySC47X9dRY"
+      }
+    },
+    {
+      "wallet": "8riWK2Q55zfzXtG1pbaYt1P27347MA4Pa6AqaBgkFXcE",
+      "amountUsdc": 0.02,
+      "before": {
+        "amount": "20000",
+        "uiAmount": 0.02,
+        "tokenAccount": "A6TuzdmkgkGSHmDMANHFCSTeJ5Z5eSh7VjUKxLuQy13X"
+      },
+      "after": {
+        "amount": "40000",
+        "uiAmount": 0.04,
+        "tokenAccount": "A6TuzdmkgkGSHmDMANHFCSTeJ5Z5eSh7VjUKxLuQy13X"
+      }
+    },
+    {
+      "wallet": "9ZVUAxA5EsUtHR3B1EFdT59KfHczSPMTWkDS819n8uVY",
+      "amountUsdc": 0.02,
+      "before": {
+        "amount": "20000",
+        "uiAmount": 0.02,
+        "tokenAccount": "AQCNcucTgpYJQ7KTseHccDFR2cRZaUVybM5U2Cp4ZNAD"
+      },
+      "after": {
+        "amount": "40000",
+        "uiAmount": 0.04,
+        "tokenAccount": "AQCNcucTgpYJQ7KTseHccDFR2cRZaUVybM5U2Cp4ZNAD"
+      }
+    }
+  ],
+  "treasury": {
+    "wallet": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
+    "before": {
+      "amount": "1997995000",
+      "uiAmount": 1997.995,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    },
+    "after": {
+      "amount": "1997895000",
+      "uiAmount": 1997.895,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    }
+  }
+}

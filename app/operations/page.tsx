@@ -1,14 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Activity, Clock3, RadioTower, ShieldCheck, WalletCards, Zap } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { AdminAuthCard } from "@/components/admin-auth-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, Td, Th } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { useAuthSession } from "@/lib/auth/client";
 
 function numberFormat(value: unknown) {
   const number = Number(value ?? 0);
@@ -17,9 +20,12 @@ function numberFormat(value: unknown) {
 
 export default function OperationsPage() {
   const queryClient = useQueryClient();
-  const health = useQuery({ queryKey: ["system-health"], queryFn: api.systemHealth, refetchInterval: 30_000 });
-  const metrics = useQuery({ queryKey: ["system-metrics"], queryFn: api.systemMetrics, refetchInterval: 30_000 });
-  const reconciliation = useQuery({ queryKey: ["reconciliation-report"], queryFn: api.reconciliationReport, refetchInterval: 30_000 });
+  const auth = useAuthSession();
+  const [validationLog, setValidationLog] = useState<string[]>([]);
+  const enabled = auth.isAuthenticated && !auth.loading;
+  const health = useQuery({ queryKey: ["system-health"], queryFn: api.systemHealth, enabled, refetchInterval: 30_000 });
+  const metrics = useQuery({ queryKey: ["system-metrics"], queryFn: api.systemMetrics, enabled, refetchInterval: 30_000 });
+  const reconciliation = useQuery({ queryKey: ["reconciliation-report"], queryFn: api.reconciliationReport, enabled, refetchInterval: 30_000 });
 
   const recoverPayouts = useMutation({
     mutationFn: api.recoverPayouts,
@@ -29,6 +35,31 @@ export default function OperationsPage() {
     mutationFn: api.replayWebhooks,
     onSuccess: () => queryClient.invalidateQueries(),
   });
+
+  async function runValidation(kind: "validate-anchor" | "live-payroll" | "batch" | "split" | "dodo" | "helius") {
+    const label = kind
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+    setValidationLog((current) => [`Running ${label}...`, ...current].slice(0, 8));
+
+    try {
+      const payload = await api.runValidation(kind);
+
+      const summary = (payload.artifact as { summary?: { passed?: number; failed?: number } } | undefined)?.summary;
+      setValidationLog((current) => [
+        `${label} complete${summary ? `: ${summary.passed ?? 0} passed, ${summary.failed ?? 0} failed` : ""}`,
+        ...current,
+      ].slice(0, 8));
+      queryClient.invalidateQueries();
+    } catch (error) {
+      setValidationLog((current) => [
+        `${label} failed: ${error instanceof Error ? error.message : String(error)}`,
+        ...current,
+      ].slice(0, 8));
+    }
+  }
 
   const checks = health.data?.checks ?? {};
   const payoutMetrics = metrics.data?.payouts ?? {};
@@ -55,20 +86,28 @@ export default function OperationsPage() {
               <Clock3 className="h-4 w-4" />
               Refresh
             </Button>
-            <Button onClick={() => recoverPayouts.mutate()} disabled={recoverPayouts.isPending}>
+            <Button onClick={() => recoverPayouts.mutate()} disabled={!enabled || recoverPayouts.isPending}>
               <Zap className="h-4 w-4" />
               Reconcile payouts
             </Button>
-            <Button variant="secondary" onClick={() => replayWebhooks.mutate()} disabled={replayWebhooks.isPending}>
+            <Button variant="secondary" onClick={() => replayWebhooks.mutate()} disabled={!enabled || replayWebhooks.isPending}>
               <Activity className="h-4 w-4" />
               Replay webhooks
             </Button>
           </div>
         </div>
 
-        {(health.error || metrics.error || reconciliation.error) && (
+        {!auth.loading && !auth.isAuthenticated ? (
+          <AdminAuthCard
+            onAuthenticated={() => {
+              queryClient.invalidateQueries();
+            }}
+          />
+        ) : null}
+
+        {auth.isAuthenticated && (health.error || metrics.error || reconciliation.error) && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-            Operations APIs require an admin bearer token in local storage as <span className="font-mono">bp_access_token</span>.
+            Operations APIs require an admin session. Please sign in with an admin account.
           </div>
         )}
 
@@ -94,6 +133,35 @@ export default function OperationsPage() {
             );
           })}
         </div>
+
+        <Card>
+          <CardHeader><CardTitle>Operations Testing Center</CardTitle></CardHeader>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {[
+              ["validate-anchor", "Validate Anchor"],
+              ["live-payroll", "Run Live Payroll"],
+              ["batch", "Run Batch Payout"],
+              ["split", "Run Split Payout"],
+              ["dodo", "Run Dodo Validation"],
+              ["helius", "Run Helius Validation"],
+            ].map(([kind, label]) => (
+              <Button key={kind} variant="secondary" onClick={() => runValidation(kind as any)} disabled={!enabled}>
+                {label}
+              </Button>
+            ))}
+          </div>
+          <div className="mt-4 rounded-lg border border-white/10 bg-zinc-900 p-4 text-sm text-zinc-300">
+            {validationLog.length ? (
+              <div className="space-y-2">
+                {validationLog.map((entry, index) => (
+                  <p key={`${entry}-${index}`}>{entry}</p>
+                ))}
+              </div>
+            ) : (
+              <p>Run phase4 checks from the browser. Each action invokes the existing backend script and reads the generated artifact.</p>
+            )}
+          </div>
+        </Card>
 
         <div className="grid gap-4 xl:grid-cols-3">
           <Card>
@@ -148,7 +216,7 @@ export default function OperationsPage() {
             <CardHeader><CardTitle>Failed Payout Intervention</CardTitle></CardHeader>
             <div className="space-y-3">
               {failedJobs.map((job: any) => (
-                <div key={job.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
+                <div key={job.id} className="rounded-lg border border-white/10 bg-zinc-900 p-3 text-sm">
                   <div className="flex items-center justify-between"><span>{job.entityId}</span><Badge tone="amber">{job.status}</Badge></div>
                   <p className="mt-2 text-zinc-500">{job.lastError ?? "Queued for retry"}</p>
                 </div>
@@ -159,7 +227,7 @@ export default function OperationsPage() {
             <CardHeader><CardTitle>Webhook Dead Letter Queue</CardTitle></CardHeader>
             <div className="space-y-3">
               {deadLetters.map((webhook: any) => (
-                <div key={webhook.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
+                <div key={webhook.id} className="rounded-lg border border-white/10 bg-zinc-900 p-3 text-sm">
                   <div className="flex items-center justify-between"><span>{webhook.provider} / {webhook.eventType ?? webhook.externalId}</span><Badge tone="red">{webhook.status}</Badge></div>
                   <p className="mt-2 text-zinc-500">{webhook.lastError ?? "Awaiting replay"}</p>
                 </div>
@@ -171,9 +239,9 @@ export default function OperationsPage() {
         <Card>
           <CardHeader><CardTitle>Database Governance Signals</CardTitle><ShieldCheck className="h-4 w-4 text-violet-300" /></CardHeader>
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">Decimal audits: enforced via Prisma Decimal and migration validation</div>
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">Indexes: payout, webhook, treasury, reconciliation hot paths covered</div>
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">Backups: documented PITR + pre-deploy snapshot runbook</div>
+            <div className="rounded-lg border border-white/10 bg-zinc-900 p-3 text-sm">Decimal audits: enforced via Prisma Decimal and migration validation</div>
+            <div className="rounded-lg border border-white/10 bg-zinc-900 p-3 text-sm">Indexes: payout, webhook, treasury, reconciliation hot paths covered</div>
+            <div className="rounded-lg border border-white/10 bg-zinc-900 p-3 text-sm">Backups: documented PITR + pre-deploy snapshot runbook</div>
           </div>
         </Card>
       </div>
