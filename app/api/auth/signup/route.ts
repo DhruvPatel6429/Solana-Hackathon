@@ -11,17 +11,6 @@ export async function POST(request: Request) {
     body = {};
   }
 
-  if (!process.env.DATABASE_URL || !request.headers.get("authorization")) {
-    return Response.json(
-      {
-        success: true,
-        companyId: "company_demo_01",
-        planTier: body.planTier ?? "Growth",
-      },
-      { status: 201 },
-    );
-  }
-
   try {
     const { requireAuthenticatedUser } = await import("@/lib/auth/server");
     const { createOrGetCompanyForUser } = await import("@/lib/db/queries/companies");

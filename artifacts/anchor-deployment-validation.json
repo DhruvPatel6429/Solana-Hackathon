@@ -1,0 +1,107 @@
+{
+  "name": "validate-anchor-deployment",
+  "generatedAt": "2026-05-12T05:43:32.802Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Anchor IDL verification",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:42:51.497Z",
+      "endedAt": "2026-05-12T05:42:51.500Z",
+      "durationMs": 3,
+      "details": {
+        "idlProgramAddress": "not_declared",
+        "requiredInstructions": {
+          "initializeEscrow": true,
+          "deposit": true,
+          "release": true
+        },
+        "discriminators": {
+          "initializeEscrow": "f3a04d990b5c30d1",
+          "deposit": "f223c68952e1f2b6",
+          "release": "fdf90fce1c7fc1f1",
+          "escrowAccount": "2445301280e17d87"
+        }
+      }
+    },
+    {
+      "name": "Deployed program ID validation",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:42:51.500Z",
+      "endedAt": "2026-05-12T05:42:51.968Z",
+      "durationMs": 468,
+      "details": {
+        "programId": "9MtY5vEpJCf31Ak19wfJ25Ef5bdVvs9nzoxeh3yEf4FB",
+        "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "executable": true,
+        "dataLength": 36
+      }
+    },
+    {
+      "name": "PDA derivation consistency",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:42:51.968Z",
+      "endedAt": "2026-05-12T05:42:51.972Z",
+      "durationMs": 4,
+      "details": {
+        "invoiceId": "684271d3c9b21ec504d40ec808f4d6b2ab810da8fab81e19b0ae8ac6146835d3",
+        "escrowPda": "DTFi2GJZeP8kb8N4oxZSCkimzNNaEucXYhG95oipo8rN",
+        "bump": 253
+      }
+    },
+    {
+      "name": "Escrow initialize/deposit/release live validation",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:42:51.972Z",
+      "endedAt": "2026-05-12T05:43:32.590Z",
+      "durationMs": 40618,
+      "details": {
+        "invoiceId": "684271d3c9b21ec504d40ec808f4d6b2ab810da8fab81e19b0ae8ac6146835d3",
+        "escrowPda": "DTFi2GJZeP8kb8N4oxZSCkimzNNaEucXYhG95oipo8rN",
+        "initializeSignature": "79srTMpKRjd2roqJAuHzYTA55DVni2fHg2bJXuWraLsFfmqgYdUhNiMNDizrzEnELTBdkG76UBzvGud5DTQGmu1",
+        "depositSignature": "3R9CPZogq8EgL8PV4mtfyuNUyNEZ7RCoe7MaiKuDiZrM5AGv4pcKtwoVbmJyDS66qJcWE7ChGZDX7BuBdrwZ4cRt",
+        "releaseSignature": "2KuKVVjjrmbio2vB7ZK3QKAKouqMFLed88fViXZLpYR6NHi7H8idDKZJVHBbPiPrnBPukiDzLAvM3AGphHjxPfRX",
+        "amountBaseUnits": "10000"
+      }
+    },
+    {
+      "name": "Escrow account deserialization",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:43:32.590Z",
+      "endedAt": "2026-05-12T05:43:32.694Z",
+      "durationMs": 104,
+      "details": {
+        "escrowPda": "DTFi2GJZeP8kb8N4oxZSCkimzNNaEucXYhG95oipo8rN",
+        "discriminator": "2445301280e17d87",
+        "dataLength": 146
+      }
+    },
+    {
+      "name": "SPL token vault ownership validation",
+      "status": "PASS",
+      "startedAt": "2026-05-12T05:43:32.694Z",
+      "endedAt": "2026-05-12T05:43:32.802Z",
+      "durationMs": 108,
+      "details": {
+        "vault": "ADe6NtvWCJbZ9NyqZomedB3nFSBPJ3niLnDP9c1gZfZS",
+        "ownerProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "vaultAuthority": "DTFi2GJZeP8kb8N4oxZSCkimzNNaEucXYhG95oipo8rN"
+      }
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0
+  },
+  "lifecycle": {
+    "invoiceId": "684271d3c9b21ec504d40ec808f4d6b2ab810da8fab81e19b0ae8ac6146835d3",
+    "escrowPda": "DTFi2GJZeP8kb8N4oxZSCkimzNNaEucXYhG95oipo8rN",
+    "vault": "ADe6NtvWCJbZ9NyqZomedB3nFSBPJ3niLnDP9c1gZfZS",
+    "initializeSignature": "79srTMpKRjd2roqJAuHzYTA55DVni2fHg2bJXuWraLsFfmqgYdUhNiMNDizrzEnELTBdkG76UBzvGud5DTQGmu1",
+    "depositSignature": "3R9CPZogq8EgL8PV4mtfyuNUyNEZ7RCoe7MaiKuDiZrM5AGv4pcKtwoVbmJyDS66qJcWE7ChGZDX7BuBdrwZ4cRt",
+    "releaseSignature": "2KuKVVjjrmbio2vB7ZK3QKAKouqMFLed88fViXZLpYR6NHi7H8idDKZJVHBbPiPrnBPukiDzLAvM3AGphHjxPfRX"
+  }
+}

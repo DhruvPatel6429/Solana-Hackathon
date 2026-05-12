@@ -63,15 +63,12 @@ export async function GET(request: Request) {
       error: message,
     });
 
-    return NextResponse.json(
-      {
-        balance: Number(company.treasuryBalanceUsdc),
-        wallet: company.treasuryWalletAddress,
-        source: "cache",
-        updatedAt: company.treasuryBalanceUpdatedAt,
-        error: message,
-      },
-      { status: 502 },
-    );
+    return NextResponse.json({
+      balance: Number(company.treasuryBalanceUsdc),
+      wallet: company.treasuryWalletAddress,
+      source: "cache",
+      updatedAt: company.treasuryBalanceUpdatedAt,
+      error: message,
+    });
   }
 }

@@ -15,12 +15,28 @@ function errorResponse(message: string, status: number): Response {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext,
 ): Promise<Response> {
   const { invoiceId } = await context.params;
 
   try {
+    const { requireTenantContext } = await import("@/lib/auth/server");
+    const { prisma } = await import("@/lib/db/prisma");
+    const tenant = await requireTenantContext(request);
+    const db = prisma as any;
+    const invoice = await db.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        companyId: tenant.companyId,
+      },
+      select: { id: true },
+    });
+
+    if (!invoice) {
+      return errorResponse(`Invoice ${invoiceId} not found.`, 404);
+    }
+
     const { getEscrowStatus } = await import("../../../../lib/solana/escrow");
     const escrow = await getEscrowStatus(invoiceId);
 
@@ -29,6 +45,12 @@ export async function GET(
       escrow,
     });
   } catch (error) {
+    const { AuthenticationError, TenantAccessError } = await import("@/lib/auth/server");
+    const { toHttpErrorResponse } = await import("@/lib/auth/http");
+    if (error instanceof AuthenticationError || error instanceof TenantAccessError) {
+      return toHttpErrorResponse(error);
+    }
+
     const message = error instanceof Error ? error.message : String(error);
     const status = message.toLowerCase().includes("escrow") ? 400 : 500;
 

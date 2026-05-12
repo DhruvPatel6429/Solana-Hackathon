@@ -1,1 +1,1 @@
-// Responsibility: React hook for contractors data placeholder.
+export { useContractors } from "@/hooks/use-app-data";

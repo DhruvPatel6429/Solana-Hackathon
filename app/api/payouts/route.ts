@@ -1,4 +1,8 @@
-import { payouts } from "@/lib/mock-data";
+import { NextResponse } from "next/server";
+
+import { toHttpErrorResponse } from "@/lib/auth/http";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { listPayoutsByCompany } from "@/lib/db/queries/payouts";
 
 type PayoutListFilters = {
   search?: string;
@@ -26,39 +30,11 @@ function parseFilters(request: Request): PayoutListFilters {
 export async function GET(request: Request) {
   const filters = parseFilters(request);
 
-  if (!request.headers.get("authorization")) {
-    const { AuthenticationError } = await import("@/lib/auth/server");
-    const { toHttpErrorResponse } = await import("@/lib/auth/http");
-    return toHttpErrorResponse(
-      new AuthenticationError("Missing Authorization header."),
-    );
-  }
-
-  if (!process.env.DATABASE_URL) {
-    if (process.env.NODE_ENV === "production") {
-      return Response.json(
-        { error: "DATABASE_URL is required to list payouts." },
-        { status: 500 },
-      );
-    }
-
-    const query = filters.search?.trim().toLowerCase();
-    const rows = payouts.filter((payout) => {
-      if (filters.kycStatus && payout.kycStatus !== filters.kycStatus) return false;
-      if (query && !`${payout.contractor} ${payout.invoiceId} ${payout.txHash}`.toLowerCase().includes(query)) return false;
-      return true;
-    });
-    return Response.json(rows);
-  }
-
   try {
-    const { requireAdmin } = await import("@/lib/auth/require-admin");
-    const { listPayoutsByCompany } = await import("@/lib/db/queries/payouts");
     const tenant = await requireAdmin(request);
     const rows = await listPayoutsByCompany(tenant.companyId, filters);
-    return Response.json(rows);
+    return NextResponse.json(rows);
   } catch (error) {
-    const { toHttpErrorResponse } = await import("@/lib/auth/http");
     return toHttpErrorResponse(error);
   }
 }

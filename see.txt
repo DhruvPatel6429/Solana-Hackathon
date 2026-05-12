@@ -1,0 +1,267 @@
+Supabase setup guide (exact repo needs)
+Create project: Supabase Dashboard → New Project.
+Get keys/URLs:
+Project Settings → API
+Project URL → NEXT_PUBLIC_SUPABASE_URL and SUPABASE_URL
+anon key → NEXT_PUBLIC_SUPABASE_ANON_KEY
+service_role key → SUPABASE_SERVICE_ROLE_KEY
+Get DB strings:
+Project Settings → Database → Connection string
+pooled URL → DATABASE_URL
+direct URL → DIRECT_URL
+Auth:
+Authentication → Providers enable Email provider.
+Create admin user in Authentication → Users.
+Apply Prisma migrations:
+Apply RLS policies:
+SQL Editor → New Query → paste prisma/rls-policies.sql → Run.
+Storage (for future invoice artifacts):
+Storage → Buckets create at least:
+invoice-files (private)
+audit-exports (private)
+Seed membership for auth enforcement (CompanyUser.userId must match Supabase auth user UUID):
+Insert organization/company/user membership rows via API or SQL.
+Admin routes require JWT with role=admin and valid CompanyUser membership.
+4) Solana devnet setup guide
+Install Solana CLI.
+Configure devnet:
+solana config set --url https://api.devnet.solana.com
+Create treasury keypair:
+solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json
+solana address -k ~/.config/solana/id.json
+Export base58 secret for .env (TREASURY_WALLET_SECRET_KEY):
+node -e "const fs=require('fs');const m=require('bs58');const b=m.default||m;const a=JSON.parse(fs.readFileSync(process.env.HOME+'/.config/solana/id.json','utf8'));console.log(b.encode(Uint8Array.from(a)));"
+Fund SOL:
+solana airdrop 2 <TREASURY_WALLET_ADDRESS> --url devnet
+solana balance <TREASURY_WALLET_ADDRESS> --url devnet
+Fund devnet USDC mint Gh9Zw...KJr to treasury ATA (from faucet/source wallet).
+Verify token accounts:
+spl-token accounts --owner <TREASURY_WALLET_ADDRESS> --url devnet
+Deploy Anchor program (after Anchor setup):
+npm run anchor:deploy
+npm run verify-program
+npm run sync-idl
+Verify escrow PDA/tx:
+Escrow status API: GET /api/escrow/<invoiceId>
+Explorer tx: https://explorer.solana.com/tx/<sig>?cluster=devnet
+Explorer address: https://explorer.solana.com/address/<pda>?cluster=devnet
+5) Anchor setup guide
+Install Rust stable + build tools.
+Install Anchor CLI matching program crates:
+npm install -g @coral-xyz/anchor-cli@0.30.1
+Build:
+npm run anchor:build
+Deploy:
+npm run anchor:deploy
+Sync IDL for runtime TS code:
+npm run sync-idl
+Validate live deployment:
+npm run phase4:validate-anchor
+Common Anchor build fixes
+
+anchor build fails due toolchain mismatch: align Solana CLI/Anchor CLI to 0.30.x-compatible stack.
+IDL missing: run npm run anchor:build then npm run sync-idl.
+Program ID mismatch: ensure ESCROW_PROGRAM_ID matches deployed program and declare_id! ID.
+6) Dodo setup guide
+Create Dodo developer account.
+Get API key → set DODO_API_KEY.
+Configure webhook endpoint:
+POST https://<APP_BASE_URL>/api/webhooks/dodo
+Configure webhook secret → set DODO_WEBHOOK_SECRET.
+Ensure sender includes:
+dodo-signature (HMAC SHA256 hex of raw payload with DODO_WEBHOOK_SECRET)
+x-webhook-timestamp
+x-webhook-nonce
+Hosted checkout integration in repo uses:
+POST /api/billing/checkout → Dodo /v1/checkout/sessions
+Usage reporting:
+POST /api/billing/report-usage → Dodo /v1/usage/events
+End-to-end webhook validation:
+npm run phase4:dodo
+7) Helius setup guide
+Create Helius account + API key (for SOLANA_RPC_URL).
+Create webhook endpoint:
+POST https://<APP_BASE_URL>/api/webhooks/helius
+Configure webhook auth secret to match HELIUS_WEBHOOK_SECRET.
+Required incoming headers (production):
+x-helius-webhook-secret (or authorization: Bearer ...)
+x-webhook-timestamp
+x-webhook-nonce
+Payload must include tokenTransfers with:
+mint = configured USDC mint
+fromUserAccount / toUserAccount
+tokenAmount (or rawTokenAmount)
+Monitor treasury wallet address used in Company.treasuryWalletAddress.
+Validate replay/idempotency:
+npm run phase4:helius
+8) Local development setup (exact commands)
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+Open http://localhost:3000.
+
+Docker local (app + postgres)
+docker compose up --build
+Redis
+Not used in current implementation.
+
+Seed scripts
+scripts/seed-db.ts is a placeholder.
+Use:
+POST /api/demo/seed (requires judge mode + auth)
+npm run phase5:demo-seed for enterprise demo dataset
+Anchor / validation commands
+npm run anchor:build
+npm run anchor:deploy
+npm run sync-idl
+npm run verify-program
+npm run phase4:setup-devnet
+npm run phase4:validate-anchor
+E2E commands
+npm test
+npm run test:e2e:devnet
+9) GitHub Actions / CI setup
+Current .github/workflows/ci.yml uses inline env placeholders for validate job and runs:
+
+npm ci
+npx prisma generate
+migration diff
+npm run typecheck
+npm test
+npm run build
+npm run anchor:build (separate job)
+Recommended repo secrets for extended CI/CD
+DATABASE_URL
+NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_SOLANA_RPC_URL / SOLANA_RPC_URL
+TREASURY_WALLET_SECRET_KEY (runtime/tests only, not standard build)
+TREASURY_WALLET_ADDRESS
+ESCROW_PROGRAM_ID
+DODO_API_KEY
+DODO_WEBHOOK_SECRET
+HELIUS_WEBHOOK_SECRET
+ADMIN_BEARER_TOKEN (for certification scripts)
+APP_BASE_URL, APP_ORIGIN
+Build-time vs runtime
+Build/typecheck/tests: need DB/supabase/solana baseline env (similar to ci.yml).
+Runtime & operational validations: need treasury secret + webhook secrets + admin bearer token.
+10) Canonical full-system startup flow
+Create/update .env from the template above.
+Start Postgres/Supabase and set DATABASE_URL + DIRECT_URL.
+Run:
+npm install
+npx prisma generate
+npx prisma migrate dev
+Apply prisma/rls-policies.sql in Supabase SQL Editor.
+Configure Solana devnet treasury + USDC + ESCROW_PROGRAM_ID.
+Build/deploy/sync Anchor:
+npm run anchor:build
+npm run anchor:deploy
+npm run sync-idl
+npm run verify-program
+Configure Dodo + Helius webhooks to /api/webhooks/dodo and /api/webhooks/helius.
+Start app:
+npm run dev
+Run setup validation:
+npm run phase4:setup-devnet
+Run operational validations:
+npm run phase4:live-payroll
+npm run phase4:batch
+npm run phase4:split
+npm run phase4:dodo
+npm run phase4:helius
+npm run phase4:recovery
+11) Real testing guide
+Escrow flow
+npm run phase4:live-payroll
+Expected:
+
+report artifacts under artifacts/live-validation/*
+escrow exists + released
+invoice becomes PAID
+payout CONFIRMED
+explorer tx signatures in artifact JSON
+Batch payouts
+npm run phase4:batch
+Expected:
+
+one finalized tx
+recipient balance deltas >= expected
+reconciliation audit row created
+Split settlement (95/5)
+npm run phase4:split
+Expected:
+
+contractor delta = 95%
+fee wallet delta = 5%
+atomic split tx on explorer
+Dodo webhook
+npm run phase4:dodo
+Expected:
+
+invalid signature rejected
+signed webhook accepted
+replay is idempotent (single DB row per event/payment)
+Helius webhook
+npm run phase4:helius
+Expected:
+
+treasury transaction persisted
+company treasury balance updated
+nonce replay blocked
+12) Troubleshooting guide
+Invalid base58 key (TREASURY_WALLET_SECRET_KEY)
+Must decode to 64 bytes. Re-export from keypair JSON correctly.
+Insufficient SOL
+Treasury needs SOL for fees/ATA creation. Airdrop and recheck.
+Missing ATA
+Code auto-creates ATA; if still failing, treasury likely lacks SOL.
+Prisma migration failures
+Ensure DIRECT_URL is direct DB host (not incompatible pooler).
+Supabase RLS blocks reads
+Apply prisma/rls-policies.sql correctly and ensure valid JWT claims + CompanyUser membership.
+Anchor build/deploy failure
+Align Rust/Solana/Anchor versions; rebuild and resync IDL.
+Webhook signature failures
+Dodo uses raw payload HMAC SHA256 hex; Helius secret must match header.
+Webhook freshness failures
+Production requires timestamp + nonce headers; include both.
+Solana finalized timeout / RPC instability
+Use paid RPC (SOLANA_RPC_URL), retry, and check blockhash freshness.
+Next.js build fails on env
+Provide required env (especially DATABASE_URL, supabase URL, webhook secrets for verification scripts).
+CI env validation failures (npm run verify:prod)
+Ensure all required production schema vars are present and correctly formatted.
+13) Production deployment guide
+Vercel (app)
+Connect repo in Vercel.
+Set all runtime env vars from section 2.
+Build command: npm run build
+Start command: npm run start
+Ensure webhook URLs use production APP_BASE_URL.
+Railway/Render/Fly (containerized)
+Use provided Dockerfile.
+Inject env vars from section 2.
+Attach managed Postgres or external Supabase DB.
+Run migration on release:
+npm run db:migrate:prod
+Health endpoint: GET /api/health.
+Production requirements checklist
+Managed Postgres backups + PITR enabled
+Stable Solana RPC provider configured
+Treasury key stored in secrets manager (not plain env files)
+Dodo/Helius webhook secrets rotated periodically
+TREASURY_WALLET_WHITELIST and ALLOWED_ESCROW_PROGRAM_IDS enforced
+Monitoring via SENTRY_DSN + admin health endpoints
+Periodic:
+npm run phase5:backup-db
+npm run phase5:dr-drill
+npm run phase5:certify
+14) Final notes on current codebase constraints
+scripts/seed-db.ts and scripts/airdrop.ts are placeholders.
+Redis/BullMQ is not currently implemented.
+CI currently uses inline env placeholders; production-grade secret-backed workflows should be added for deploy/runtime checks.
+The escrow system and payout engine are devnet-oriented in current implementation; mainnet rollout requires new mint/program/RPC/wallet controls before go-live.
+GPT-5.3-Codex • 1x

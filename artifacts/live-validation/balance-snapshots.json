@@ -1,0 +1,30 @@
+{
+  "runId": "live_1778526246551_a0e104",
+  "mint": "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
+  "contractor": {
+    "wallet": "ENnoJYU8ZX5j6b8ax3RPVUrkyN6yPRfzrFmMRVpuf1Gu",
+    "before": {
+      "amount": "1550000",
+      "uiAmount": 1.55,
+      "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+    },
+    "after": {
+      "amount": "1600000",
+      "uiAmount": 1.6,
+      "tokenAccount": "EFHoc42vccXPVG5sUBUZc7Du39AD1hMXYoddnGQuosEj"
+    }
+  },
+  "treasury": {
+    "wallet": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
+    "before": {
+      "amount": "1998045000",
+      "uiAmount": 1998.045,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    },
+    "after": {
+      "amount": "1997995000",
+      "uiAmount": 1997.995,
+      "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { toHttpErrorResponse } from "@/lib/auth/http";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
+import { approveInvoice } from "@/lib/services/invoice.service";
 import { executePayout } from "@/lib/services/payout.service";
 
 const db = prisma as any;
@@ -71,6 +72,40 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       },
       { status: 409 },
     );
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const shouldSettle = body?.settle !== false;
+
+  if (!shouldSettle) {
+    try {
+      const approved =
+        invoice.status === "APPROVED"
+          ? invoice
+          : await approveInvoice({
+              invoiceId,
+              adminId: tenant.userId,
+            });
+
+      return NextResponse.json({
+        success: true,
+        invoice: {
+          id: approved.id,
+          status: "APPROVED",
+          approvedAt: approved.approvedAt,
+          amountUsdc: approved.amountUsdc,
+          contractorId: approved.contractorId,
+        },
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Invoice approval failed.",
+        },
+        { status: 500 },
+      );
+    }
   }
 
   const wallet = invoice.contractor?.walletAddress;

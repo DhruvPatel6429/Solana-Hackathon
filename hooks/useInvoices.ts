@@ -1,1 +1,1 @@
-// Responsibility: React hook for invoices data placeholder.
+export { useInvoices, useInvoiceActions } from "@/hooks/use-app-data";

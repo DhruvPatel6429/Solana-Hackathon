@@ -1,0 +1,34 @@
+{
+  "runId": "live_1778526246551_a0e104",
+  "companyId": "company_live_1778526246551_a0e104",
+  "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+  "auditRecords": [
+    {
+      "id": "cmp1kmius0001h4uargkmtj50",
+      "organizationId": null,
+      "companyId": "company_live_1778526246551_a0e104",
+      "action": "INVOICE_APPROVED",
+      "actorUserId": "phase4-admin-live_1778526246551_a0e104",
+      "metadata": {
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr",
+        "amountUsdc": "0.05",
+        "contractorId": "contractor_live_1778526246551_a0e104"
+      },
+      "createdAt": "2026-05-11T19:04:37.876Z"
+    },
+    {
+      "id": "cmp1kmv430003h4uac5r2l2kw",
+      "organizationId": null,
+      "companyId": "company_live_1778526246551_a0e104",
+      "action": "payout_confirmed",
+      "actorUserId": null,
+      "metadata": {
+        "txHash": "2hPPV9yrjwF3y2wiYLJ18g8gbecwZvycgfK4nE7vvMwqtpcP8b9DLi3ABj5aJ5RCzdUj6LhaA1PQ3PSvHzCMUBv7",
+        "payoutId": "cmp1kmjhb0002h4uahweco8ej",
+        "escrowPda": "ARrKN3heJ628q5pxnTenbuuww2NKxZGhLd8BtnyGGBbP",
+        "invoiceId": "cmp1klvwg0000h4ualq9s74vr"
+      },
+      "createdAt": "2026-05-11T19:04:53.763Z"
+    }
+  ]
+}

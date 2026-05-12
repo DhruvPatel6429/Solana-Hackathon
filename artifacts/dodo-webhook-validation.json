@@ -1,0 +1,119 @@
+{
+  "name": "test-dodo-webhook",
+  "generatedAt": "2026-05-11T19:13:05.416Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Seed company for Dodo billing persistence",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:12:58.232Z",
+      "endedAt": "2026-05-11T19:12:59.775Z",
+      "durationMs": 1543,
+      "details": {
+        "companyId": "company_dodo_1778526778232_a61562"
+      }
+    },
+    {
+      "name": "Reject invalid Dodo signature",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:12:59.775Z",
+      "endedAt": "2026-05-11T19:13:02.420Z",
+      "durationMs": 2645,
+      "details": {
+        "status": 400,
+        "body": {
+          "received": false,
+          "error": "Invalid Dodo webhook signature."
+        }
+      }
+    },
+    {
+      "name": "Send signed Dodo webhook payload",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:13:02.420Z",
+      "endedAt": "2026-05-11T19:13:03.932Z",
+      "durationMs": 1512,
+      "details": {
+        "status": 200,
+        "body": {
+          "received": true,
+          "accountUpdate": {
+            "eventId": "evt_dodo_1778526778232_a61562",
+            "companyId": "company_dodo_1778526778232_a61562",
+            "status": "paid",
+            "subscriptionId": "sub_dodo_1778526778232_a61562",
+            "customerId": "cus_dodo_1778526778232_a61562",
+            "plan": "growth",
+            "processed": true
+          }
+        }
+      }
+    },
+    {
+      "name": "Verify DB persistence after first delivery",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:13:03.932Z",
+      "endedAt": "2026-05-11T19:13:04.732Z",
+      "durationMs": 800,
+      "details": {
+        "webhookEventId": "cmp1kxclv0001yguaspk27wil",
+        "billingEventId": "cmp1kxcva0002yguaaao2wvjp",
+        "status": "paid"
+      }
+    },
+    {
+      "name": "Replay same webhook for idempotency",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:13:04.732Z",
+      "endedAt": "2026-05-11T19:13:05.416Z",
+      "durationMs": 684,
+      "details": {
+        "replayStatus": 200,
+        "webhookCount": 1,
+        "billingCount": 1
+      }
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0
+  },
+  "runId": "dodo_1778526778232_a61562",
+  "endpoint": "http://localhost:3000/api/webhooks/dodo",
+  "companyId": "company_dodo_1778526778232_a61562",
+  "eventId": "evt_dodo_1778526778232_a61562",
+  "paymentId": "pay_dodo_1778526778232_a61562",
+  "firstResponse": {
+    "status": 200,
+    "body": {
+      "received": true,
+      "accountUpdate": {
+        "eventId": "evt_dodo_1778526778232_a61562",
+        "companyId": "company_dodo_1778526778232_a61562",
+        "status": "paid",
+        "subscriptionId": "sub_dodo_1778526778232_a61562",
+        "customerId": "cus_dodo_1778526778232_a61562",
+        "plan": "growth",
+        "processed": true
+      }
+    }
+  },
+  "replayResponse": {
+    "status": 200,
+    "body": {
+      "received": true,
+      "accountUpdate": {
+        "eventId": "evt_dodo_1778526778232_a61562",
+        "companyId": "company_dodo_1778526778232_a61562",
+        "status": "paid",
+        "subscriptionId": "sub_dodo_1778526778232_a61562",
+        "customerId": "cus_dodo_1778526778232_a61562",
+        "plan": "growth",
+        "processed": true
+      }
+    }
+  }
+}

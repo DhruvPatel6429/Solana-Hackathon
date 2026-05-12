@@ -21,9 +21,10 @@ function roleFromClaims(claims: Record<string, unknown>): string | undefined {
 
 export async function requireAdmin(request: Request): Promise<AdminContext> {
   const tenant = await requireTenantContext(request);
-  const role = roleFromClaims(tenant.claims);
+  const claimedRole = roleFromClaims(tenant.claims)?.toLowerCase();
+  const membershipRole = String(tenant.membershipRole ?? "").toLowerCase();
 
-  if (role !== "admin") {
+  if (claimedRole !== "admin" && !["admin", "owner"].includes(membershipRole)) {
     throw new TenantAccessError("Admin access is required.");
   }
 

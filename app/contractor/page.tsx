@@ -15,9 +15,10 @@
  * Uses Supabase client-side auth for the JWT token.
  */
 
-import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
+import { apiFetchJson } from "@/lib/api";
+import { decodeJwtPayload, getMetadataString, useAuthSession } from "@/lib/auth/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,19 +73,6 @@ const KYC_CONFIG = {
   REJECTED: { label: "KYC Rejected", bg: "bg-rose-500/15",   text: "text-rose-400"   },
 } as const;
 
-// ─── Supabase client ──────────────────────────────────────────────────────────
-
-function createSupabaseBrowserClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return null;
-  }
-
-  return createClient(url, anonKey);
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
@@ -104,6 +92,22 @@ function formatUsdc(amount: number) {
 
 function shortId(id: string) {
   return `#${id.slice(0, 8).toUpperCase()}`;
+}
+
+function amountValue(value: unknown): number {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return Number(value);
+  }
+
+  if (value && typeof value === "object" && "toNumber" in value) {
+    return Number((value as { toNumber: () => number }).toNumber());
+  }
+
+  return 0;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -165,7 +169,7 @@ function EmptyState({ message }: { message: string }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContractorPortalPage() {
-  const [token, setToken]               = useState<string | null>(null);
+  const auth = useAuthSession();
   const [contractor, setContractor]     = useState<Contractor | null>(null);
   const [invoices, setInvoices]         = useState<Invoice[]>([]);
   const [pagination, setPagination]     = useState<Pagination | null>(null);
@@ -174,40 +178,26 @@ export default function ContractorPortalPage() {
   const [loading, setLoading]           = useState(true);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [error, setError]               = useState<string | null>(null);
+  const contractorId = useMemo(() => {
+    if (!auth.accessToken) {
+      return undefined;
+    }
+
+    return getMetadataString(decodeJwtPayload(auth.accessToken), "contractorId");
+  }, [auth.accessToken]);
 
   // ── Auth: get session token ───────────────────────────────────────────────
+  // ── Fetch contractor profile ──────────────────────────────────────────────
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      setError("Supabase environment variables are not configured.");
-      setLoading(false);
+    if (auth.loading) {
       return;
     }
 
-    const auth = supabase.auth as any;
-
-    auth.getSession().then(({ data: { session } }: { data: { session: { access_token?: string } | null } }) => {
-      if (session?.access_token) {
-        setToken(session.access_token);
-      } else {
-        setError("Not authenticated. Please sign in.");
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = auth.onAuthStateChange((_e: string, session: { access_token?: string } | null) => {
-      setToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ── Fetch contractor profile ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!token) return;
-
-    const meta = JSON.parse(atob(token.split(".")[1]));
-    const contractorId = meta?.user_metadata?.contractorId as string | undefined;
+    if (!auth.isAuthenticated) {
+      setError("Not authenticated. Please sign in.");
+      setLoading(false);
+      return;
+    }
 
     if (!contractorId) {
       setError("No contractor profile linked to this account.");
@@ -215,21 +205,17 @@ export default function ContractorPortalPage() {
       return;
     }
 
-    fetch(`/api/contractors/${contractorId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
+    apiFetchJson<{ contractor: Contractor }>(`/api/contractors/${contractorId}`)
       .then((data) => {
-        if (data.error) throw new Error(data.error);
         setContractor(data.contractor);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [auth.isAuthenticated, auth.loading, contractorId]);
 
   // ── Fetch invoices ────────────────────────────────────────────────────────
   const fetchInvoices = useCallback(() => {
-    if (!token) return;
+    if (!auth.isAuthenticated) return;
 
     setInvoicesLoading(true);
 
@@ -239,26 +225,22 @@ export default function ContractorPortalPage() {
       ...(statusFilter !== "ALL" && { status: statusFilter }),
     });
 
-    fetch(`/api/invoices?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
+    apiFetchJson<{ invoices: Invoice[]; pagination: Pagination }>(`/api/invoices?${params}`)
       .then((data) => {
-        if (data.error) throw new Error(data.error);
         setInvoices(data.invoices);
         setPagination(data.pagination);
       })
       .catch((e) => setError(e.message))
       .finally(() => setInvoicesLoading(false));
-  }, [token, page, statusFilter]);
+  }, [auth.isAuthenticated, page, statusFilter]);
 
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
 
   // ── Derived stats ─────────────────────────────────────────────────────────
-  const totalEarned  = invoices.filter((i) => i.status === "PAID").reduce((s, i) => s + (typeof i.amountUsdc === 'number' ? i.amountUsdc : i.amountUsdc.toNumber()), 0);
-  const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + (typeof i.amountUsdc === 'number' ? i.amountUsdc : i.amountUsdc.toNumber()), 0);
+  const totalEarned  = invoices.filter((i) => i.status === "PAID").reduce((s, i) => s + amountValue(i.amountUsdc), 0);
+  const totalPending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + amountValue(i.amountUsdc), 0);
   const paidCount    = invoices.filter((i) => i.status === "PAID").length;
   const pendingCount = invoices.filter((i) => i.status === "PENDING").length;
 
@@ -491,7 +473,7 @@ export default function ContractorPortalPage() {
                     {/* Amount */}
                     <div className="text-right shrink-0">
                       <p className="text-base font-bold font-mono text-white">
-                        ${formatUsdc(invoice.amountUsdc)}
+                        ${formatUsdc(amountValue(invoice.amountUsdc))}
                         <span className="text-xs font-normal text-[#6b7280] ml-1">USDC</span>
                       </p>
 

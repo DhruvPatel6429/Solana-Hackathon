@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { serverEnv } from "@/config/env";
 
 const db = prisma as any;
 
@@ -47,6 +48,34 @@ export async function createOrGetCompanyForUser({
     });
 
     if (existingMembership?.company) {
+      const treasuryWalletAddress = serverEnv.treasuryWalletAddress();
+      const updates: Record<string, string> = {};
+
+      if (companyName?.trim()) {
+        updates.name = companyName.trim();
+      }
+
+      if (planTier?.trim()) {
+        updates.planTier = planTier.trim();
+      }
+
+      if (treasuryWalletAddress) {
+        updates.treasuryWalletAddress = treasuryWalletAddress;
+      }
+
+      if (Object.keys(updates).length) {
+        return tx.company.update({
+          where: { id: existingMembership.company.id },
+          data: updates,
+          select: {
+            id: true,
+            name: true,
+            planTier: true,
+            createdAt: true,
+          },
+        });
+      }
+
       return existingMembership.company;
     }
 
@@ -63,6 +92,7 @@ export async function createOrGetCompanyForUser({
         name: companyName?.trim() || `Company ${userId.slice(0, 8)}`,
         planTier: planTier?.trim() || "Starter",
         organizationId: organization.id,
+        treasuryWalletAddress: serverEnv.treasuryWalletAddress() || null,
       },
       select: {
         id: true,

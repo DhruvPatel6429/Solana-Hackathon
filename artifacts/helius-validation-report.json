@@ -1,0 +1,118 @@
+{
+  "name": "test-helius-webhook",
+  "generatedAt": "2026-05-11T19:09:38.100Z",
+  "environment": {
+    "network": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com"
+  },
+  "checks": [
+    {
+      "name": "Seed company for treasury webhook persistence",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:16.927Z",
+      "endedAt": "2026-05-11T19:09:17.843Z",
+      "durationMs": 916,
+      "details": {
+        "companyId": "company_helius_1778526556927_d5df3b",
+        "treasuryWallet": "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
+        "seededCompanyInitialTreasuryBalanceUpdatedAt": null
+      }
+    },
+    {
+      "name": "Trigger treasury transfer on devnet",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:17.843Z",
+      "endedAt": "2026-05-11T19:09:31.337Z",
+      "durationMs": 13494,
+      "details": {
+        "transferSignature": "3iyKA5LDcbyb4rAqK8iRnkTBcqazdnnpUoB9Lgg21gNtrdhiMWd4eW3tEq8z5jo4a4y76Lm2PNebEyssrQjzKGY6",
+        "explorerUrl": "https://explorer.solana.com/tx/3iyKA5LDcbyb4rAqK8iRnkTBcqazdnnpUoB9Lgg21gNtrdhiMWd4eW3tEq8z5jo4a4y76Lm2PNebEyssrQjzKGY6?cluster=devnet",
+        "transferAmount": 0.01
+      }
+    },
+    {
+      "name": "Capture pre-webhook treasury timestamp baseline",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:31.337Z",
+      "endedAt": "2026-05-11T19:09:32.264Z",
+      "durationMs": 927,
+      "details": {
+        "monitoredWallets": [
+          "HKMCREafKxAPT5Twu4DHLdApoFEkXNfBqUfx76kwnGwP",
+          "ENnoJYU8ZX5j6b8ax3RPVUrkyN6yPRfzrFmMRVpuf1Gu"
+        ],
+        "baselineCompanyCount": 15
+      }
+    },
+    {
+      "name": "Deliver Helius webhook payload",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:32.264Z",
+      "endedAt": "2026-05-11T19:09:34.812Z",
+      "durationMs": 2548,
+      "details": {
+        "endpoint": "http://localhost:3000/api/webhooks/helius",
+        "status": 200,
+        "body": {
+          "received": true,
+          "processedCount": 1,
+          "processed": [
+            {
+              "signature": "3iyKA5LDcbyb4rAqK8iRnkTBcqazdnnpUoB9Lgg21gNtrdhiMWd4eW3tEq8z5jo4a4y76Lm2PNebEyssrQjzKGY6",
+              "direction": "OUTGOING",
+              "amountUsdc": 0.01
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Verify treasury persistence + balance update",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:34.812Z",
+      "endedAt": "2026-05-11T19:09:35.356Z",
+      "durationMs": 544,
+      "details": {
+        "treasuryTransactionId": "cmp1ksv3a00062suavfyr0a0u",
+        "companyId": "company_split_1778520298203_2f6121",
+        "direction": "OUTGOING",
+        "amountUsdc": "0.01",
+        "companyBalanceUsdc": "1997.785",
+        "treasuryBalanceUpdatedAt": "2026-05-11T19:09:34.136Z",
+        "treasuryBalanceBaseline": "2026-05-11T18:31:36.342Z",
+        "treasuryBalanceTimestampDeltaMs": 2277794,
+        "liveTreasury": {
+          "amount": "1997785000",
+          "uiAmount": 1997.785,
+          "tokenAccount": "5eMWy3tGWqAGY2gjz2N42XRhh3YnJCATq7F9MuzriQ8v"
+        }
+      }
+    },
+    {
+      "name": "Verify webhook replay protections",
+      "status": "PASS",
+      "startedAt": "2026-05-11T19:09:35.356Z",
+      "endedAt": "2026-05-11T19:09:38.099Z",
+      "durationMs": 2743,
+      "details": {
+        "replayStatus": 200,
+        "nonceReplayStatus": 400,
+        "treasuryTransactionCount": 1
+      }
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0
+  },
+  "runId": "helius_1778526556927_d5df3b",
+  "companyId": "company_helius_1778526556927_d5df3b",
+  "heliusUrl": "http://localhost:3000/api/webhooks/helius",
+  "transferSignature": "3iyKA5LDcbyb4rAqK8iRnkTBcqazdnnpUoB9Lgg21gNtrdhiMWd4eW3tEq8z5jo4a4y76Lm2PNebEyssrQjzKGY6",
+  "explorerUrl": "https://explorer.solana.com/tx/3iyKA5LDcbyb4rAqK8iRnkTBcqazdnnpUoB9Lgg21gNtrdhiMWd4eW3tEq8z5jo4a4y76Lm2PNebEyssrQjzKGY6?cluster=devnet",
+  "statuses": {
+    "firstWebhookStatus": 200,
+    "replayStatus": 200,
+    "nonceReplayStatus": 400
+  }
+}

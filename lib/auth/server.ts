@@ -1,6 +1,5 @@
 // SINGLE SOURCE OF TRUTH FOR AUTH — all API routes must use this module
-import { createPublicKey, verify as verifySignature } from "node:crypto";
-import type { JsonWebKey } from "node:crypto";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 import { serverEnv } from "@/config/env";
 
@@ -42,6 +41,7 @@ type AuthenticatedUser = {
 export type TenantContext = AuthenticatedUser & {
   companyId: string;
   membershipId: string;
+  membershipRole: string;
 };
 
 export class AuthenticationError extends Error {
@@ -62,13 +62,7 @@ export class TenantAccessError extends Error {
   }
 }
 
-const JWKS_CACHE_TTL_MS = 10 * 60 * 1000;
-let jwksCache:
-  | {
-      expiresAt: number;
-      keysByKid: Map<string, JwkKey>;
-    }
-  | undefined;
+let supabaseAdminClient: SupabaseClient | undefined;
 
 function base64UrlDecode(value: string): string {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -126,38 +120,6 @@ function getBearerToken(request: Request): string {
   return match[1];
 }
 
-async function getJwks(): Promise<Map<string, JwkKey>> {
-  const now = Date.now();
-
-  if (jwksCache && jwksCache.expiresAt > now) {
-    return jwksCache.keysByKid;
-  }
-
-  const supabaseUrl = serverEnv.supabaseUrl().replace(/\/+$/, "");
-  const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
-  const response = await fetch(jwksUrl, { method: "GET" });
-
-  if (!response.ok) {
-    throw new AuthenticationError("Failed to fetch Supabase JWKS.");
-  }
-
-  const jwks = (await response.json()) as JwksResponse;
-  const keysByKid = new Map<string, JwkKey>();
-
-  for (const key of jwks.keys ?? []) {
-    if (key?.kid) {
-      keysByKid.set(key.kid, key);
-    }
-  }
-
-  jwksCache = {
-    expiresAt: now + JWKS_CACHE_TTL_MS,
-    keysByKid,
-  };
-
-  return keysByKid;
-}
-
 function assertTimeClaims(payload: JwtPayload): void {
   const nowInSeconds = Math.floor(Date.now() / 1000);
 
@@ -179,6 +141,36 @@ function assertIssuer(payload: JwtPayload): void {
   }
 }
 
+function getSupabaseAdminClient(): SupabaseClient {
+  if (!supabaseAdminClient) {
+    supabaseAdminClient = createClient(
+      serverEnv.supabaseUrl(),
+      serverEnv.supabaseServiceRoleKey(),
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      },
+    );
+  }
+
+  return supabaseAdminClient;
+}
+
+function claimsFromUser(user: User, rawPayload: JwtPayload): JwtPayload {
+  return {
+    ...rawPayload,
+    sub: user.id,
+    aud: user.aud,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    app_metadata: user.app_metadata ?? {},
+    user_metadata: user.user_metadata ?? {},
+  };
+}
+
 async function verifySupabaseJwt(token: string): Promise<JwtPayload> {
   if (process.env.NODE_ENV === "test" && token.startsWith("test:")) {
     const [, userId = "test-user"] = token.split(":");
@@ -191,52 +183,18 @@ async function verifySupabaseJwt(token: string): Promise<JwtPayload> {
     };
   }
 
-  const { header, payload, signedPart, signature } = parseJwt(token);
-
-  if (header.alg !== "RS256") {
-    throw new AuthenticationError("Unsupported JWT algorithm.");
-  }
-
-  if (!header.kid) {
-    throw new AuthenticationError("JWT is missing key id.");
-  }
-
-  const jwks = await getJwks();
-  const jwk = jwks.get(header.kid);
-
-  if (!jwk) {
-    throw new AuthenticationError("JWT key id is unknown.");
-  }
-
-  let isValid = false;
-
-  try {
-    const keyObject = createPublicKey({
-      key: jwk as JsonWebKey,
-      format: "jwk",
-    });
-    isValid = verifySignature(
-      "RSA-SHA256",
-      Buffer.from(signedPart),
-      keyObject,
-      signature,
-    );
-  } catch {
-    throw new AuthenticationError("Failed to validate JWT signature.");
-  }
-
-  if (!isValid) {
-    throw new AuthenticationError("JWT signature is invalid.");
-  }
+  const { payload } = parseJwt(token);
 
   assertIssuer(payload);
   assertTimeClaims(payload);
 
-  if (!payload.sub || typeof payload.sub !== "string") {
-    throw new AuthenticationError("JWT subject is missing.");
+  const { data, error } = await getSupabaseAdminClient().auth.getUser(token);
+
+  if (error || !data.user) {
+    throw new AuthenticationError(error?.message ?? "Invalid Supabase session.");
   }
 
-  return payload;
+  return claimsFromUser(data.user, payload);
 }
 
 export async function requireAuthenticatedUser(
@@ -261,7 +219,7 @@ export async function requireTenantContext(
 
   const membership = await db.companyUser.findUnique({
     where: { userId: user.userId },
-    select: { id: true, companyId: true },
+    select: { id: true, companyId: true, role: true },
   });
 
   if (!membership) {
@@ -272,5 +230,6 @@ export async function requireTenantContext(
     ...user,
     companyId: membership.companyId,
     membershipId: membership.id,
+    membershipRole: membership.role,
   };
 }
