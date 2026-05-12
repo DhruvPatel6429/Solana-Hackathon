@@ -8,29 +8,29 @@ import { installPrismaTestDb } from "../helpers/prisma-test-db";
 
 const originalApiKey = process.env.DODO_API_KEY;
 const originalSecret = process.env.DODO_WEBHOOK_SECRET;
+const originalGrowthProduct = process.env.DODO_GROWTH_PRODUCT_ID;
 const originalFetch = globalThis.fetch;
 let restoreDb: (() => void) | undefined;
 
 beforeEach(async () => {
   process.env.DODO_API_KEY = "dodo_test_api_key";
+  process.env.DODO_GROWTH_PRODUCT_ID = "pdt_growth_test";
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.includes("/v1/checkout/sessions")) {
+    if (url.includes("/checkouts")) {
       return new Response(
         JSON.stringify({
-          checkoutUrl: "https://billing.example/checkout?checkout=growth",
-          customerId: "dodo_cus_demo_growth",
-          subscriptionId: "dodo_sub_demo_growth",
+          checkout_url: "https://billing.example/checkout?checkout=growth",
+          session_id: "cks_growth_test",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }
 
-    if (url.includes("/v1/usage/events")) {
+    if (url.includes("/events/ingest")) {
       return new Response(
         JSON.stringify({
-          success: true,
-          usageEventId: "usage_INV-1001",
+          ingested_count: 1,
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -45,7 +45,7 @@ beforeEach(async () => {
   const installed = await installPrismaTestDb();
   restoreDb = installed.restore;
   await installed.prisma.company.create({
-    data: { id: "company_demo_01", name: "Demo Billing Co" },
+    data: { id: "company_demo_01", name: "Demo Billing Co", dodoCustomerId: "cus_demo_01" },
   });
   await installed.prisma.companyUser.create({
     data: {
@@ -62,6 +62,7 @@ afterEach(() => {
   restoreDb = undefined;
   process.env.DODO_API_KEY = originalApiKey;
   process.env.DODO_WEBHOOK_SECRET = originalSecret;
+  process.env.DODO_GROWTH_PRODUCT_ID = originalGrowthProduct;
   globalThis.fetch = originalFetch;
 });
 
@@ -82,8 +83,8 @@ describe("Member 1 Dodo billing API flow", () => {
 
     assert.equal(response.status, 200);
     assert.equal(json.url.includes("checkout=growth"), true);
-    assert.equal(json.customerId, "dodo_cus_demo_growth");
-    assert.equal(json.subscriptionId, "dodo_sub_demo_growth");
+    assert.equal(json.customerId, "cus_demo_01");
+    assert.equal(json.subscriptionId, "");
   });
 
   test("usage route records one billable unit after payout or invoice events", async () => {

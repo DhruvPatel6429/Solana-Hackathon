@@ -32,6 +32,10 @@ export async function GET(request: Request) {
         planTier: true,
         dodoCustomerId: true,
         dodoSubscriptionId: true,
+        billingStatus: true,
+        billingPortalUrl: true,
+        subscriptionUpdatedAt: true,
+        webhookLastReceivedAt: true,
         treasuryWalletAddress: true,
         feeWalletAddress: true,
         treasuryBalanceUsdc: true,
@@ -119,8 +123,9 @@ export async function GET(request: Request) {
         customerId: company.dodoCustomerId,
         subscriptionId: company.dodoSubscriptionId,
         status:
+          company.billingStatus ??
           latestBillingEvent?.status ??
-          (company.dodoSubscriptionId ? "active" : "pending_checkout"),
+          (company.dodoSubscriptionId ? "active" : "pending"),
         webhookSync:
           latestDodoWebhook?.processed && recentWithinDays(latestDodoWebhook.processedAt, 7)
             ? "confirmed"
@@ -129,6 +134,9 @@ export async function GET(request: Request) {
               : "pending",
         latestEventAt: latestBillingEvent?.createdAt ?? latestDodoWebhook?.createdAt ?? null,
         latestPaymentId: latestBillingEvent?.dodoPaymentId ?? null,
+        portalUrl: company.billingPortalUrl,
+        subscriptionUpdatedAt: company.subscriptionUpdatedAt,
+        webhookLastReceivedAt: company.webhookLastReceivedAt,
         recentEvents: billingEvents.map((event: any) => ({
           id: event.id,
           dodoPaymentId: event.dodoPaymentId,

@@ -192,6 +192,12 @@ export async function installPrismaTestDb(): Promise<{
       planTier: data.planTier ?? null,
       dodoCustomerId: data.dodoCustomerId ?? null,
       dodoSubscriptionId: data.dodoSubscriptionId ?? null,
+      dodoCheckoutSessionId: data.dodoCheckoutSessionId ?? null,
+      dodoPaymentId: data.dodoPaymentId ?? null,
+      billingStatus: data.billingStatus ?? null,
+      billingPortalUrl: data.billingPortalUrl ?? null,
+      subscriptionUpdatedAt: data.subscriptionUpdatedAt ?? null,
+      webhookLastReceivedAt: data.webhookLastReceivedAt ?? null,
       treasuryWalletAddress: data.treasuryWalletAddress ?? null,
       treasuryBalanceUsdc: data.treasuryBalanceUsdc ?? "0",
       treasuryBalanceUpdatedAt: data.treasuryBalanceUpdatedAt ?? null,
@@ -405,6 +411,8 @@ export async function installPrismaTestDb(): Promise<{
       companyId: data.companyId,
       eventType: data.eventType,
       dodoEventId: data.dodoEventId ?? null,
+      usageSyncedAt: data.usageSyncedAt ?? null,
+      lastReportedUsage: data.lastReportedUsage ?? null,
       reportedAt: data.reportedAt ?? now(),
     };
     db.usageEvent.rows.push(row);
@@ -474,6 +482,15 @@ export async function installPrismaTestDb(): Promise<{
       .map((row) => ({ ...row }));
   });
 
+  replace(prisma.webhookEvent, "findFirst", async ({ where }: any = {}) => {
+    const rows = db.webhookEvent.rows.filter((candidate) => matchesWhere(candidate, where));
+    return rows.sort((a, b) => (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0))[0] ?? null;
+  });
+
+  replace(prisma.webhookEvent, "count", async ({ where }: any = {}) => {
+    return db.webhookEvent.rows.filter((candidate) => matchesWhere(candidate, where)).length;
+  });
+
   replace(prisma.billingEvent, "upsert", async ({ where, create, update }: any) => {
     const row = db.billingEvent.rows.find(
       (candidate) => candidate.dodoPaymentId === where.dodoPaymentId,
@@ -492,6 +509,19 @@ export async function installPrismaTestDb(): Promise<{
     };
     db.billingEvent.rows.push(created);
     return { ...created };
+  });
+
+  replace(prisma.billingEvent, "findFirst", async ({ where }: any = {}) => {
+    const rows = db.billingEvent.rows.filter((candidate) => matchesWhere(candidate, where));
+    return rows.sort((a, b) => (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0))[0] ?? null;
+  });
+
+  replace(prisma.billingEvent, "findMany", async ({ where, take }: any = {}) => {
+    return db.billingEvent.rows
+      .filter((candidate) => matchesWhere(candidate, where))
+      .sort((a, b) => (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0))
+      .slice(0, take ?? db.billingEvent.rows.length)
+      .map((row) => ({ ...row }));
   });
 
   replace(prisma.treasuryTransaction, "upsert", async ({ where, create, update }: any) => {

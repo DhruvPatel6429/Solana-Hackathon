@@ -73,6 +73,12 @@ model Company {
   planTier             String?
   dodoCustomerId       String?
   dodoSubscriptionId   String?
+  dodoCheckoutSessionId String?
+  dodoPaymentId        String?
+  billingStatus        String?
+  billingPortalUrl     String?
+  subscriptionUpdatedAt DateTime?
+  webhookLastReceivedAt DateTime?
   treasuryWalletAddress String?
   feeWalletAddress     String?
   treasuryBalanceUsdc  Decimal      @default(0)
@@ -195,6 +201,8 @@ model UsageEvent {
   companyId  String
   eventType  String
   dodoEventId String?
+  usageSyncedAt DateTime?
+  lastReportedUsage Json?
   reportedAt DateTime @default(now())
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 

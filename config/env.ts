@@ -42,6 +42,9 @@ const productionEnvSchema: Record<string, EnvField> = {
   ESCROW_PROGRAM_ID: publicKeyField,
   HELIUS_WEBHOOK_SECRET: { required: true, redact: true },
   DODO_WEBHOOK_SECRET: { required: true, redact: true },
+  DODO_API_KEY: { required: true, redact: true },
+  DODO_BASE_URL: urlField(true),
+  NEXT_PUBLIC_APP_URL: urlField(true),
   APP_ORIGIN: urlField(true),
 };
 
